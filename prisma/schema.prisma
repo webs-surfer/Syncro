@@ -1,0 +1,132 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  clerkId   String   @unique
+  email     String   @unique
+  name      String
+  avatarUrl String?
+  role      UserRole @default(MEMBER)
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  createdWorkspaces Workspace[] @relation("WorkspaceCreator")
+  createdProjects   Project[]   @relation("ProjectCreator")
+  createdTasks      Task[]      @relation("TaskCreator")
+  assignedTasks     Task[]      @relation("TaskAssignee")
+
+  @@index([tenantId])
+  @@index([clerkId])
+}
+
+model Tenant {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  plan      PlanTier @default(FREE)
+  ownerId   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users      User[]
+  workspaces Workspace[]
+
+  @@index([slug])
+}
+
+model Workspace {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdById String
+  createdBy   User     @relation("WorkspaceCreator", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  projects Project[]
+
+  @@index([tenantId])
+}
+
+model Project {
+  id          String        @id @default(cuid())
+  name        String
+  description String?
+  status      ProjectStatus @default(ACTIVE)
+  workspaceId String
+  workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdById String
+  createdBy   User          @relation("ProjectCreator", fields: [createdById], references: [id])
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  tasks Task[]
+
+  @@index([workspaceId])
+}
+
+model Task {
+  id          String       @id @default(cuid())
+  title       String
+  description String?
+  status      TaskStatus   @default(BACKLOG)
+  priority    TaskPriority @default(MEDIUM)
+  order       Int          @default(0)
+  projectId   String
+  project     Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  assigneeId  String?
+  assignee    User?        @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  createdById String
+  createdBy   User         @relation("TaskCreator", fields: [createdById], references: [id])
+  dueDate     DateTime?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([projectId])
+  @@index([assigneeId])
+  @@index([status])
+}
+
+enum UserRole {
+  ADMIN
+  MEMBER
+  VIEWER
+}
+
+enum PlanTier {
+  FREE
+  PRO
+  ENTERPRISE
+}
+
+enum ProjectStatus {
+  ACTIVE
+  ARCHIVED
+  COMPLETED
+}
+
+enum TaskStatus {
+  BACKLOG
+  TODO
+  IN_PROGRESS
+  IN_REVIEW
+  DONE
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
