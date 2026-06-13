@@ -8,9 +8,9 @@ import { useState } from 'react'
 
 const navItems = [
   { label: 'Dashboard', href: '/dashboard', icon: '⊞' },
-  { label: 'Projects',  href: '/dashboard/projects',  icon: '◫' },
-  { label: 'Tasks',     href: '/dashboard/tasks',      icon: '✓' },
-  { label: 'Settings',  href: '/dashboard/settings',   icon: '⚙' },
+  { label: 'Projects',  href: '/projects',  icon: '◫' },
+  { label: 'Tasks',     href: '/tasks',      icon: '✓' },
+  { label: 'Settings',  href: '/settings',   icon: '⚙' },
 ]
 
 export default function Sidebar() {
@@ -71,8 +71,8 @@ export default function Sidebar() {
       {/* Nav links */}
       <nav className="flex flex-col gap-0.5 flex-1">
         {navItems.map(({ label, href, icon }) => {
-            // Active if pathname is exactly href, or if pathname ends with the last segment of href (to handle subpages)   
-          const isActive = pathname === href || pathname.endsWith('/'+href)
+          // Active if pathname is exactly href, or if it is a subpage of href
+          const isActive = pathname === href || (href !== '/' && pathname.startsWith(href + '/'))
 
           return (
             <Link
@@ -109,7 +109,6 @@ export default function Sidebar() {
       <div className={`${collapsed ? 'flex justify-center' : 'px-3'}`}>
         <div className={`flex items-center ${collapsed ? 'justify-center' : 'gap-3'}`}>
           <UserButton
-            afterSignOutUrl="/login"
             appearance={{
               elements: { avatarBox: 'w-8 h-8' },
             }}

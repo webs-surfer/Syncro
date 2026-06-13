@@ -177,10 +177,10 @@ export default function SettingsPage() {
                       <button
                         key={color}
                         title={label}
-                        className="w-7 h-7 rounded-full ring-offset-2 ring-2 transition-all"
+                        className="w-7 h-7 rounded-full transition-all"
                         style={{
                           background: color,
-                          ringColor: color === '#2563eb' ? color : 'transparent',
+                          boxShadow: color === '#2563eb' ? `0 0 0 2px #fff, 0 0 0 4px ${color}` : 'none',
                         }}
                       />
                     ))}

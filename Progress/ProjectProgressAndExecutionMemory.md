@@ -21,9 +21,9 @@ It behaves like a living project dashboard + task memory system.
 | Field | Value |
 |---|---|
 | Current Phase | Build |
-| Active Module | Infrastructure & Auth |
+| Active Module | UI Layer — Complete. Next: Database & Backend |
 | System Health | On Track |
-| Last Updated | Post architecture decisions session |
+| Last Updated | After full UI layer completion |
 
 ---
 
@@ -65,18 +65,29 @@ Every task MUST be in one of these states:
 | Define initial Prisma database schema | Core | 🟢 COMPLETED | Wrote User, Tenant, Workspace, Project, Task models |
 | Define TypeScript types & Service layer stubs | Core | 🟢 COMPLETED | Initial types and services skeleton generated |
 | Establish API v1 endpoint stubs & layouts | Core | 🟢 COMPLETED | Auth, projects, tasks, tenants API and page routes setup |
-| Revise Prisma schema for schema-per-tenant architecture | Core | ⬜ BACKLOG | Schema must support dynamic tenant schemas — existing schema needs revision |
-| Configure Supabase project & connection strings | Infra | ⬜ BACKLOG | Needs Supabase project URL + anon key + service role key in `.env` |
-| Build tenant-aware Prisma client factory | Infra | ⬜ BACKLOG | Dynamic schema switching: `prisma.$executeRaw('SET search_path TO tenant_xyz')` |
-| Build auth system (Clerk integration) | Auth | ⬜ BACKLOG | Needs Clerk API key config; middleware + server actions |
-| Clerk webhook → Supabase user sync | Auth | ⬜ BACKLOG | On user.created event, provision tenant schema + seed default workspace |
-| WorkspaceMember model + per-workspace RBAC | Workspace | ⬜ BACKLOG | `WorkspaceMember` join table: userId, workspaceId, role (owner/editor/viewer) |
-| Workspace creation & membership system | Workspace | ⬜ BACKLOG | Requires Clerk + DB connection live |
-| Project creation & settings module | Project | ⬜ BACKLOG | Requires workspace module complete |
-| Task CRUD operations (Todo / In Progress / Done) | Tasks | ⬜ BACKLOG | 3-state `TaskStatus` enum; server actions for create/update/delete/reorder |
-| Kanban board UI with dnd-kit | Tasks | ⬜ BACKLOG | `@dnd-kit/core` + `@dnd-kit/sortable`; optimistic updates via TanStack Query |
-| Supabase Realtime subscription for board updates | Tasks | ⬜ BACKLOG | Subscribe to task table changes per workspace; update Kanban state live |
-| Avatar upload + crop UI | Profile | ⬜ BACKLOG | Supabase Storage bucket; crop library (e.g. `react-image-crop`) |
+| Clerk authentication integration | Auth | 🟢 COMPLETED | ClerkProvider, proxy.ts middleware, sign-in/sign-up pages, protected routes |
+| Landing page | UI | 🟢 COMPLETED | Hero, features, CTA, footer — light theme, blue accent |
+| Dashboard layout + sidebar | UI | 🟢 COMPLETED | Dark sidebar with collapse toggle, UserButton, active state |
+| Dashboard page | UI | 🟢 COMPLETED | Greeting, stats cards, upcoming deadlines, quick actions |
+| Projects page | UI | 🟢 COMPLETED | Card grid with priority badge, lead, members, status |
+| Project detail page | UI | 🟢 COMPLETED | Kanban board with drag-drop, progress bar, team meta row |
+| Project task detail page | UI | 🟢 COMPLETED | params-based routing, status dropdown, assignees, project back-link |
+| Tasks page (personal) | UI | 🟢 COMPLETED | Kanban of assigned tasks only, drag-drop, project name on card |
+| Task detail page (personal) | UI | 🟢 COMPLETED | Status, assignees, due date, "View in My Tasks" ↔ project link |
+| Settings page | UI | 🟢 COMPLETED | Profile, appearance toggles, danger zone |
+| Routing structure fixed | Core | 🟢 COMPLETED | (auth) and (dashboard) route groups, proxy.ts at src/ level |
+| Dashboard layout scroll bug fixed | UI | 🟢 COMPLETED | h-screen overflow-hidden on layout, overflow-y-auto on content |
+| Revise Prisma schema for schema-per-tenant | Core | ⬜ BACKLOG | Add WorkspaceMember with role enum, TaskStatus 3-state enum |
+| Configure Supabase project & connection strings | Infra | ⬜ BACKLOG | Needs Supabase URL + anon key + service role key in .env |
+| Build tenant-aware Prisma client factory | Infra | ⬜ BACKLOG | Dynamic search_path switching per tenant schema |
+| Clerk webhook → tenant provisioning | Auth | ⬜ BACKLOG | On user.created: create schema, Tenant row, seed default Workspace |
+| WorkspaceMember RBAC system | Workspace | ⬜ BACKLOG | Join table + role-gated server action guards |
+| Workspace creation & membership system | Workspace | ⬜ BACKLOG | Requires Clerk + DB live |
+| Project CRUD — wire to DB | Project | ⬜ BACKLOG | Replace placeholder data with real Prisma queries via project.service.ts |
+| Task CRUD — wire to DB | Tasks | ⬜ BACKLOG | 3-state TaskStatus; server actions for create/update/delete/reorder |
+| Kanban board — replace with dnd-kit | Tasks | ⬜ BACKLOG | Swap native HTML5 DnD with @dnd-kit/core + @dnd-kit/sortable |
+| Supabase Realtime subscription | Tasks | ⬜ BACKLOG | Live board updates per workspace |
+| Avatar upload + crop UI | Profile | ⬜ BACKLOG | Supabase Storage bucket + react-image-crop |
 
 ---
 
@@ -91,7 +102,12 @@ Once marked COMPLETED, entries are NEVER edited — only appended.
 - ✅ Prisma schema created with PostgreSQL connector and core entities defined
 - ✅ Domain model TypeScript definitions & Service layer stubs created
 - ✅ API v1 REST route stubs and dashboard layouts established
-- ✅ All 10 architecture decisions locked and confirmed by user (DB, tenancy, RBAC, DnD, workflow, billing, realtime, files, notifications, avatars)
+- ✅ All 10 architecture decisions locked and confirmed by user
+- ✅ Clerk authentication fully integrated (ClerkProvider, middleware, sign-in/sign-up/sign-out)
+- ✅ Full UI layer built — landing page, dashboard, projects, tasks, settings, all detail pages
+- ✅ Task ↔ Project navigation wired (personal tasks link to project tasks and back)
+- ✅ Routing structure corrected — (auth)/(dashboard) route groups, proxy.ts at src/ root
+- ✅ Dashboard layout scroll bug fixed — viewport-locked layout with internal scroll
 
 ---
 
@@ -99,10 +115,11 @@ Once marked COMPLETED, entries are NEVER edited — only appended.
 
 | Blocker | Owner | Impact | Status |
 |---|---|---|---|
-| Supabase project URL + keys not yet in `.env` | User | 🔴 HIGH — blocks all DB work | ❌ Open |
-| Clerk API keys not yet configured | User | 🔴 HIGH — blocks all auth work | ❌ Open |
-| ~~Avatar cropping UX approval pending~~ | ~~User~~ | ~~Low~~ | ✅ Resolved — custom upload + crop confirmed |
-| ~~Task drag-drop library selection pending~~ | ~~User~~ | ~~Medium~~ | ✅ Resolved — dnd-kit confirmed |
+| Supabase project URL + keys not in `.env` | User | 🔴 HIGH — blocks all DB work | ❌ Open |
+| Clerk webhook secret not configured | User | 🔴 HIGH — blocks tenant provisioning | ❌ Open |
+| ~~Avatar cropping UX approval pending~~ | ~~User~~ | ~~Low~~ | ✅ Resolved |
+| ~~Task drag-drop library selection pending~~ | ~~User~~ | ~~Medium~~ | ✅ Resolved — dnd-kit |
+| ~~Clerk API keys~~ | ~~User~~ | ~~High~~ | ✅ Resolved — keys configured |
 
 ---
 
@@ -110,18 +127,17 @@ Once marked COMPLETED, entries are NEVER edited — only appended.
 
 Ordered by: dependency readiness → impact on system completion → module dependencies.
 
-1. **Revise Prisma schema** — update to support schema-per-tenant (add `WorkspaceMember` with role enum, revise `Task` status enum to 3 states)
-2. **Configure Supabase + `.env` setup** — connection string, anon key, service role key, Storage bucket for avatars
-3. **Build tenant-aware Prisma client factory** — dynamic `search_path` switching per tenant schema
-4. **Clerk auth integration** — middleware, sign-in/sign-up pages, server actions
-5. **Clerk webhook → tenant provisioning** — on `user.created`, create tenant schema + seed default workspace
-6. **WorkspaceMember RBAC system** — join table + role-gated server action guards
-7. **Workspace creation & membership UI**
-8. **Project creation & settings module**
-9. **Task CRUD + 3-state workflow engine**
-10. **Kanban board UI** — dnd-kit columns (Todo / In Progress / Done) + optimistic updates
-11. **Supabase Realtime** — live board subscriptions per workspace
-12. **Avatar upload + crop** — Supabase Storage + `react-image-crop`
+1. **Configure Supabase + `.env`** — project URL, anon key, service role key, database connection string
+2. **Revise Prisma schema** — schema-per-tenant, WorkspaceMember + role enum, TaskStatus enum
+3. **Run Prisma migration** — `prisma db push` against Supabase
+4. **Build tenant-aware Prisma client factory** — `lib/prisma.ts` + `lib/getTenant.ts`
+5. **Clerk webhook → tenant provisioning** — `api/webhooks/clerk/route.ts`, create schema + User + Workspace on signup
+6. **WorkspaceMember RBAC** — join table + role guards on server actions
+7. **Project CRUD server actions** — wire projects page to real DB via `project.service.ts`
+8. **Task CRUD server actions** — wire tasks kanban to real DB via `task.service.ts`
+9. **Replace HTML5 DnD with dnd-kit** — `@dnd-kit/core` + `@dnd-kit/sortable` on kanban boards
+10. **Supabase Realtime** — live task updates per workspace board
+11. **Avatar upload + crop** — Supabase Storage + `react-image-crop`
 
 ---
 

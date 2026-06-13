@@ -1,0 +1,276 @@
+import { auth, currentUser } from "@clerk/nextjs/server";
+import { redirect } from "next/navigation";
+import Link from "next/link";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
+import { mockProjects, mockTasks } from "@/lib/mockData";
+
+// Calculate dynamic stats
+const totalProjectsCount = Object.keys(mockProjects).length;
+const openTasksCount = Object.values(mockTasks).filter(t => t.status !== 'done').length;
+
+const stats = [
+  {
+    label: "Total Projects",
+    value: String(totalProjectsCount),
+    description: totalProjectsCount === 1 ? "1 project active" : `${totalProjectsCount} projects active`,
+    href: "/projects",
+    cta: "View projects →",
+    accent: "text-blue-600",
+    border: "border-blue-100",
+  },
+  {
+    label: "Open Tasks",
+    value: String(openTasksCount),
+    description: openTasksCount === 1 ? "1 task open" : `${openTasksCount} tasks open`,
+    href: "/tasks",
+    cta: "View tasks →",
+    accent: "text-sky-600",
+    border: "border-sky-100",
+  },
+];
+
+const quickActions = [
+  {
+    label: "New Project",
+    description: "Start a new project for your team",
+    href: "/projects",
+  },
+  {
+    label: "New Task",
+    description: "Add a task to an existing project",
+    href: "/tasks",
+  },
+];
+
+const recentProjects = Object.values(mockProjects).slice(0, 3);
+const recentTasks = Object.values(mockTasks)
+  .filter((t) => t.status !== 'done')
+  .slice(0, 3);
+
+// Derive deadlines dynamically from mock tasks
+const deadlines = Object.values(mockTasks)
+  .filter((t) => t.dueDate && t.status !== 'done')
+  .map((t) => {
+    // parse due date: since dueDate in mockTasks is like 'Jun 12', let's parse it relative to current year
+    const year = new Date().getFullYear();
+    const dateStr = `${t.dueDate}, ${year}`;
+    const parsedDate = new Date(Date.parse(dateStr));
+    return {
+      id: t.id,
+      title: t.title,
+      project: t.project.name,
+      projectId: t.project.id,
+      dueDate: parsedDate,
+      projectHref: `/projects/${t.project.id}`,
+      taskHref: `/projects/${t.project.id}/tasks/${t.id}`,
+    };
+  });
+
+function formatDueDate(date: Date): { label: string; urgent: boolean } {
+  const now = new Date();
+  const diff = Math.ceil(
+    (date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
+  );
+
+  if (diff === 0) return { label: "Due today", urgent: true };
+  if (diff === 1) return { label: "Due tomorrow", urgent: true };
+  if (diff <= 3) return { label: `Due in ${diff} days`, urgent: true };
+  return {
+    label: `Due ${date.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`,
+    urgent: false,
+  };
+}
+
+export default async function DashboardPage() {
+  const { userId } = await auth();
+  if (!userId) redirect("/login");
+
+  const user = await currentUser();
+  const firstName = user?.firstName ?? "there";
+
+  const hour = new Date().getHours();
+  const greeting =
+    hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+
+  return (
+    <main className="flex-1 p-8">
+      {/* Header */}
+      <div className="mb-8">
+        <p className="text-sm text-zinc-400 font-medium mb-1">{greeting}</p>
+        <h1 className="text-2xl font-semibold text-zinc-900 tracking-tight">
+          {firstName} 👋
+        </h1>
+        <p className="text-zinc-500 text-sm mt-1">
+          Here is what is happening in your workspace today.
+        </p>
+      </div>
+
+      <Separator className="mb-8" />
+
+      {/* Stats + Deadlines row */}
+      <section className="mb-10">
+        <p className="text-xs font-semibold uppercase tracking-widest text-zinc-400 mb-4">
+          Overview
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {/* Stat cards */}
+          {stats.map(
+            ({ label, value, description, href, cta, accent, border }) => (
+              <Card key={label} className={`border ${border}`}>
+                <CardHeader className="pb-2">
+                  <CardDescription>{label}</CardDescription>
+                  <CardTitle className="text-4xl font-bold tabular-nums">
+                    {value}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-zinc-400">{description}</span>
+                    <Link
+                      href={href}
+                      className={`text-xs font-medium ${accent} hover:opacity-70 transition-opacity`}
+                    >
+                      {cta}
+                    </Link>
+                  </div>
+
+                  {label === 'Total Projects' && (
+                    <div className="space-y-2">
+                      {recentProjects.map((project) => (
+                        <Link
+                          key={project.id}
+                          href={`/projects/${project.id}`}
+                          className="block rounded-xl bg-zinc-50 px-3 py-2 hover:bg-zinc-100 transition-colors"
+                        >
+                          <p className="text-xs font-semibold text-zinc-900 truncate">
+                            {project.name}
+                          </p>
+                          <p className="text-[10px] text-zinc-500 truncate">
+                            {project.status} · {project.members.length} members
+                          </p>
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+
+                  {label === 'Open Tasks' && (
+                    <div className="space-y-2">
+                      {recentTasks.map((task) => (
+                        <Link
+                          key={task.id}
+                          href={`/tasks/${task.id}`}
+                          className="block rounded-xl bg-zinc-50 px-3 py-2 hover:bg-zinc-100 transition-colors"
+                        >
+                          <p className="text-xs font-semibold text-zinc-900 truncate">
+                            {task.title}
+                          </p>
+                          <p className="text-[10px] text-zinc-500 truncate">
+                            {task.project.name}
+                          </p>
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            ),
+          )}
+
+          {/* Upcoming deadlines card */}
+          <Card className="border border-zinc-100 row-span-1">
+            <CardHeader className="pb-2">
+              <CardDescription>Upcoming Deadlines</CardDescription>
+              <CardTitle className="text-sm font-semibold text-zinc-700">
+                {deadlines.length} upcoming
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <div className="flex flex-col divide-y divide-zinc-50">
+                {deadlines.slice(0, 3).map((item) => {
+                  const { label, urgent } = formatDueDate(item.dueDate);
+                  return (
+                    <Link
+                      key={item.id}
+                      href={item.taskHref}
+                      className="py-2.5 first:pt-0 last:pb-0 block hover:opacity-70 transition-opacity"
+                    >
+                      <p className="text-xs font-medium text-zinc-800 leading-snug mb-0.5 truncate">
+                        {item.title}
+                      </p>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[11px] text-zinc-400 truncate">
+                          {item.project}
+                        </span>
+                        <span
+                          className={`text-[10px] font-medium shrink-0 px-1.5 py-0.5 rounded-full ${
+                            urgent
+                              ? "bg-red-50 text-red-500"
+                              : "bg-zinc-100 text-zinc-500"
+                          }`}
+                        >
+                          {label}
+                        </span>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+
+              {deadlines.length > 3 && (
+                <>
+                  <Separator className="my-2" />
+                  <Link
+                    href="/projects"
+                    className="flex items-center justify-center gap-1 w-full pt-1 text-[11px] font-medium text-zinc-400 hover:text-zinc-600 transition-colors"
+                  >
+                    <span>+{deadlines.length - 3} more</span>
+                    <span>→</span>
+                  </Link>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </section>
+
+      {/* Quick Actions */}
+      <section>
+        <p className="text-xs font-semibold uppercase tracking-widest text-zinc-400 mb-4">
+          Quick Actions
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {quickActions.map(({ label, description, href }) => (
+            <Card
+              key={label}
+              className="border border-zinc-200 hover:border-zinc-300 hover:shadow-sm transition-all duration-150"
+            >
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-semibold">{label}</CardTitle>
+                <CardDescription className="text-xs">
+                  {description}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button
+                  asChild
+                  size="sm"
+                  className="w-full bg-zinc-900 hover:bg-zinc-700 text-white"
+                >
+                  <Link href={href}>+ {label}</Link>
+                </Button>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </section>
+    </main>
+  );
+}

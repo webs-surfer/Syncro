@@ -4,6 +4,17 @@
 @import '@tabler/icons-webfont/dist/tabler-icons.css';
 @custom-variant dark (&:is(.dark *));
 
+* {
+  
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
