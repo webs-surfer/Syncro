@@ -138,4 +138,29 @@ html, body {
   html {
     @apply font-sans;
   }
+
+  html[data-compact='true'] {
+    font-size: 0.94rem;
+  }
+
+  html[data-compact='true'] body {
+    letter-spacing: -0.01em;
+  }
+
+  html[data-compact='true'] input,
+  html[data-compact='true'] textarea,
+  html[data-compact='true'] select,
+  html[data-compact='true'] button {
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+  }
+
+  html[data-compact='true'] .gap-6 {
+    gap: 0.75rem;
+  }
+
+  html[data-compact='true'] .text-sm {
+    line-height: 1.25;
+  }
+
 }

@@ -1,225 +1,416 @@
 import Link from 'next/link'
 import { auth } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
-const features = [
+const highlightFeatures = [
   {
     icon: 'ti-layout-kanban',
-    title: 'Project management',
-    description:
-      'Create and organize projects. Set goals, track progress, keep your team aligned from start to finish.',
+    iconColor: '#7C3AED',
+    title: 'Agile Workspaces',
+    description: 'Scrum & Kanban boards with WIP limits built in.',
   },
   {
-    icon: 'ti-checkbox',
-    title: 'Task tracking',
-    description:
-      'Break work into tasks, assign to teammates, and move them through a simple workflow.',
+    icon: 'ti-brand-github',
+    iconColor: '#00A3FF',
+    title: 'Developer Integrations',
+    description: 'Two-way sync with GitHub, GitLab, and Jira.',
   },
   {
-    icon: 'ti-columns',
-    title: 'Kanban board',
-    description:
-      'Visualize your workflow with drag-and-drop. See where every task stands at a glance.',
-  },
-  {
-    icon: 'ti-users',
-    title: 'Team workspaces',
-    description:
-      'Invite your team, assign roles, and collaborate in a shared workspace built for real work.',
+    icon: 'ti-file-text',
+    iconColor: '#22C55E',
+    title: 'Collaborative Docs',
+    description: 'Integrated knowledge base with inline comments.',
   },
 ]
+
+const detailedFeatures = [
+  {
+    icon: 'ti-stack-2',
+    iconColor: '#7C3AED',
+    title: 'Agile Workspaces',
+    description:
+      'Run sprints with Scrum or Kanban boards. Set WIP limits, track velocity, and keep every sprint goal visible to the whole team.',
+  },
+  {
+    icon: 'ti-brand-gitlab',
+    iconColor: '#EC4899',
+    title: 'Developer Integrations',
+    description:
+      'Connect GitHub and GitLab for two-way sync. Link PRs to tasks, auto-update statuses on merge, and never lose context between code and planning.',
+  },
+  {
+    icon: 'ti-file-plus',
+    iconColor: '#22C55E',
+    title: 'Collaborative Docs',
+    description:
+      'Build a living knowledge base alongside your projects. Inline comments, version history, and shared templates keep everyone aligned.',
+  },
+]
+
+const assignedIssues = [
+  { title: 'Refactor auth middleware', status: 'In Progress', statusColor: '#00A3FF' },
+  { title: 'Fix webhook retry logic', status: 'Blocked', statusColor: '#EF4444' },
+  { title: 'Add feature flag support', status: 'Open', statusColor: '#6B7280' },
+]
+
+const recentActivity = [
+  { text: 'Merged PR #482 into main', time: '2h ago' },
+  { text: 'Sprint 14 started', time: '5h ago' },
+  { text: 'Evelyn commented on API spec', time: '1d ago' },
+]
+
+const milestones = [
+  { title: 'API v2 launch', days: '3d left', color: '#22C55E' },
+  { title: 'Security audit', days: '7d left', color: '#F59E0B' },
+  { title: 'Beta rollout', days: '12d left', color: '#6B7280' },
+]
+
+const footerLinks = {
+  Product: ['Features', 'Pricing', 'Integrations', 'Changelog'],
+  Resources: ['Docs', 'Blog', 'API Reference', 'Community'],
+  Company: ['About', 'Careers', 'Privacy', 'Terms'],
+}
+
+function SyncroLogo({ size = 'md' }: { size?: 'sm' | 'md' }) {
+  const dim = size === 'sm' ? 'w-[22px] h-[22px] text-[10px]' : 'w-[28px] h-[28px] text-xs'
+  const textSize = size === 'sm' ? 'text-sm' : 'text-base'
+  return (
+    <div className="flex items-center gap-2.5">
+      <div
+        className={`${dim} rounded-lg flex items-center justify-center text-white font-bold shrink-0`}
+        style={{ background: '#7C3AED' }}
+      >
+        <i className="ti ti-users text-[13px]" aria-hidden="true" />
+      </div>
+      <span className={`${textSize} font-bold tracking-tight text-black`}>Syncro</span>
+    </div>
+  )
+}
+
+function KanbanMockup() {
+  const columns = [
+    { label: 'Backlog', color: '#374151', cards: [{ color: '#7C3AED', w: 'w-[72%]' }, { color: '#00A3FF', w: 'w-[85%]' }] },
+    { label: 'In Progress', color: '#1E3A5F', cards: [{ color: '#F59E0B', w: 'w-[90%]' }, { color: '#22C55E', w: 'w-[65%]' }] },
+    { label: 'Review', color: '#374151', cards: [{ color: '#EC4899', w: 'w-[78%]' }] },
+    { label: 'Done', color: '#374151', cards: [{ color: '#6B7280', w: 'w-[60%]' }, { color: '#7C3AED', w: 'w-[70%]' }] },
+  ]
+
+  return (
+    <div
+      className="rounded-2xl overflow-hidden shadow-2xl"
+      style={{ background: '#0B0E14', border: '1px solid #1F2937' }}
+    >
+      <div className="flex items-center gap-2 px-4 py-3" style={{ borderBottom: '1px solid #1F2937' }}>
+        <div className="flex gap-1.5">
+          <span className="w-2.5 h-2.5 rounded-full bg-red-500/80" />
+          <span className="w-2.5 h-2.5 rounded-full bg-yellow-500/80" />
+          <span className="w-2.5 h-2.5 rounded-full bg-green-500/80" />
+        </div>
+        <span className="text-[11px] text-gray-500 ml-2">Orion API — Sprint Board</span>
+      </div>
+      <div className="p-4 grid grid-cols-4 gap-3 min-h-[280px]">
+        {columns.map((col) => (
+          <div key={col.label} className="flex flex-col gap-2">
+            <span className="text-[10px] font-medium text-gray-500 uppercase tracking-wider mb-1">
+              {col.label}
+            </span>
+            {col.cards.map((card, i) => (
+              <div
+                key={i}
+                className={`${card.w} h-10 rounded-lg`}
+                style={{ background: card.color, opacity: 0.85 }}
+              />
+            ))}
+          </div>
+        ))}
+      </div>
+      <svg className="absolute inset-0 pointer-events-none opacity-20" aria-hidden="true">
+        <line x1="30%" y1="40%" x2="55%" y2="55%" stroke="#7C3AED" strokeWidth="1" strokeDasharray="4" />
+        <line x1="55%" y1="55%" x2="78%" y2="45%" stroke="#00A3FF" strokeWidth="1" strokeDasharray="4" />
+      </svg>
+    </div>
+  )
+}
+
+function DashboardPanel() {
+  return (
+    <div
+      className="rounded-2xl p-5 h-full flex flex-col gap-5"
+      style={{ background: '#0B0E14', border: '1px solid #1F2937' }}
+    >
+      <div className="flex items-center gap-3">
+        <div
+          className="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-semibold shrink-0"
+          style={{ background: '#7C3AED' }}
+        >
+          EP
+        </div>
+        <div>
+          <p className="text-sm font-semibold text-white">Evelyn Park</p>
+          <p className="text-[11px] text-gray-500">Senior PM · Orion API</p>
+        </div>
+      </div>
+
+      <div>
+        <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-3">
+          My Assigned Issues
+        </p>
+        <div className="flex flex-col gap-2">
+          {assignedIssues.map((issue) => (
+            <div
+              key={issue.title}
+              className="flex items-center justify-between gap-2 rounded-lg px-3 py-2.5"
+              style={{ background: '#111827' }}
+            >
+              <span className="text-[12px] text-gray-300 truncate">{issue.title}</span>
+              <span
+                className="text-[10px] font-medium px-2 py-0.5 rounded shrink-0"
+                style={{ color: issue.statusColor, background: `${issue.statusColor}18` }}
+              >
+                {issue.status}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-3">
+          Recent Activity
+        </p>
+        <div className="flex flex-col gap-2.5">
+          {recentActivity.map((item) => (
+            <div key={item.text} className="flex items-start justify-between gap-2">
+              <span className="text-[12px] text-gray-400 leading-snug">{item.text}</span>
+              <span className="text-[10px] text-gray-600 shrink-0">{item.time}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-3">
+          Upcoming Sprint Milestones
+        </p>
+        <div className="flex flex-col gap-2">
+          {milestones.map((m) => (
+            <div key={m.title} className="flex items-center justify-between">
+              <span className="text-[12px] text-gray-300">{m.title}</span>
+              <span className="text-[11px] font-medium" style={{ color: m.color }}>
+                {m.days}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="mt-auto pt-2">
+        <div className="flex items-end gap-1 h-16">
+          {[40, 55, 45, 70, 60, 85, 75, 90, 65, 80].map((h, i) => (
+            <div
+              key={i}
+              className="flex-1 rounded-sm"
+              style={{
+                height: `${h}%`,
+                background: i % 3 === 0 ? '#F59E0B' : '#374151',
+                opacity: 0.8,
+              }}
+            />
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
 
 export default async function HomePage() {
   const { userId } = await auth()
   if (userId) redirect('/dashboard')
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: '#f4f4f6' }}>
+    <div className="min-h-screen flex flex-col bg-white">
 
-      {/* Navbar */}
-      <header
-        className="sticky top-0 z-10 flex items-center justify-between px-8 h-[52px] bg-white"
-        style={{ borderBottom: '0.5px solid #e4e4e7' }}
-      >
-        <div className="flex items-center gap-2.5">
-          <div
-            className="w-[26px] h-[26px] rounded-[7px] flex items-center justify-center text-white text-xs font-bold shrink-0"
-            style={{ background: '#2563eb' }}
+      {/* Header */}
+      <header className="sticky top-0 z-20 bg-white/95 backdrop-blur-sm border-b border-gray-100">
+        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+          <SyncroLogo />
+
+          <nav className="hidden md:flex items-center gap-8">
+            {['Features', 'Pricing', 'Docs'].map((item) => (
+              <a
+                key={item}
+                href={`#${item.toLowerCase()}`}
+                className="text-sm text-gray-500 hover:text-gray-900 transition-colors"
+              >
+                {item}
+              </a>
+            ))}
+          </nav>
+
+          <Link
+            href="/register"
+            className="text-sm font-medium text-white px-5 py-2 rounded-lg transition-opacity hover:opacity-90"
+            style={{ background: '#00A3FF' }}
           >
-            C
-          </div>
-          <span className="text-sm font-medium tracking-tight text-zinc-900">
-            CollabPM
-          </span>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" asChild className="text-zinc-500 hover:text-zinc-900 text-sm">
-            <Link href="/login">Sign in</Link>
-          </Button>
-          <Button size="sm" asChild
-            className="text-sm font-medium rounded-lg"
-            style={{ background: '#2563eb', color: '#fff', border: 'none' }}
-          >
-            <Link href="/register">Get started</Link>
-          </Button>
+            Get Started
+          </Link>
         </div>
       </header>
 
       {/* Hero */}
-      <section className="flex flex-col items-center text-center px-6 pt-[72px] pb-16 max-w-[680px] mx-auto w-full">
-        <div
-          className="inline-flex items-center gap-1.5 text-[11px] font-medium px-[14px] py-1 rounded-full mb-7"
-          style={{
-            color: '#2563eb',
-            background: '#eff6ff',
-            border: '0.5px solid #bfdbfe',
-            letterSpacing: '0.02em',
-          }}
-        >
-          <span className="w-[5px] h-[5px] rounded-full shrink-0" style={{ background: '#2563eb' }} />
-          Now in beta
-        </div>
-
-        <h1
-          className="text-[48px] font-semibold leading-[1.1] mb-5 text-[#0f172a]"
-          style={{ letterSpacing: '-1.5px' }}
-        >
-          Collaborative workspace
-          <br />
-          <span
-            style={{
-              background: 'linear-gradient(135deg,#2563eb 0%,#1d4ed8 50%,#60a5fa 100%)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              backgroundClip: 'text',
-            }}
-          >
-            for modern teams
-          </span>
-        </h1>
-
-        <p className="text-base leading-[1.75] mb-9 max-w-[460px] text-slate-500">
-          Manage projects, track tasks, and keep your team in sync — all in one
-          fast workspace built for how teams actually work.
-        </p>
-
-        <div className="flex items-center gap-3 flex-wrap justify-center mb-3">
-          <Button size="lg" asChild
-            className="rounded-[9px] px-7 text-sm font-medium"
-            style={{ background: '#2563eb', color: '#fff', border: 'none' }}
-          >
-            <Link href="/register">Start for free</Link>
-          </Button>
-          <Button size="lg" variant="outline" asChild
-            className="rounded-[9px] px-7 text-sm bg-white text-zinc-700"
-            style={{ border: '0.5px solid #d1d5db' }}
-          >
-            <Link href="/login">Sign in</Link>
-          </Button>
-        </div>
-        <p className="text-xs text-zinc-400">No credit card required.</p>
-      </section>
-
-      <div style={{ borderTop: '0.5px solid #e4e4e7' }} />
-
-      {/* Features */}
-      <section className="py-16 px-8" style={{ background: '#f4f4f6' }}>
-        <p
-          className="text-center text-[10px] font-semibold uppercase mb-2.5"
-          style={{ letterSpacing: '0.12em', color: '#94a3b8' }}
-        >
-          Features
-        </p>
-        <div className="text-center mb-10">
-          <h2 className="text-[28px] font-semibold text-[#0f172a] mb-2" style={{ letterSpacing: '-0.5px' }}>
-            Everything your team needs
-          </h2>
-          <p className="text-sm text-slate-500 max-w-[380px] mx-auto leading-[1.7]">
-            A focused set of tools to help teams move faster without the overhead
-            of complex software.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-[640px] mx-auto">
-          {features.map(({ icon, title, description }) => (
-            <Card
-              key={title}
-              className="bg-white rounded-[14px]"
-              style={{ border: '0.5px solid #e4e4e7' }}
+      <section className="max-w-7xl mx-auto px-6 pt-16 pb-12 w-full">
+        <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
+          <div>
+            <h1
+              className="text-[44px] lg:text-[52px] font-bold leading-[1.08] text-black mb-5"
+              style={{ letterSpacing: '-1.5px' }}
             >
-              <CardHeader className="pb-2">
-                <div
-                  className="w-9 h-9 rounded-[9px] flex items-center justify-center text-[17px] mb-3"
-                  style={{
-                    background: '#eff6ff',
-                    border: '0.5px solid #bfdbfe',
-                    color: '#2563eb',
-                  }}
-                >
-                  <i className={`ti ${icon}`} aria-hidden="true" />
-                </div>
-                <CardTitle className="text-sm font-semibold text-[#0f172a]">
-                  {title}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-[13px] text-slate-500 leading-[1.65]">{description}</p>
-              </CardContent>
-            </Card>
+              Ship Software Faster, Together.
+            </h1>
+            <p className="text-base text-gray-500 leading-relaxed mb-8 max-w-[480px]">
+              Syncro brings agile workflows, sprint tools, and real-time synchronization
+              into one workspace — so engineering teams can plan, build, and ship without
+              the overhead.
+            </p>
+            <div className="flex items-center gap-3 flex-wrap mb-6">
+              <Link
+                href="/register"
+                className="text-sm font-medium text-white px-6 py-3 rounded-lg transition-opacity hover:opacity-90"
+                style={{ background: '#7C3AED' }}
+              >
+                Start Building for Free
+              </Link>
+              <Link
+                href="/login"
+                className="text-sm font-medium text-white px-6 py-3 rounded-lg transition-opacity hover:opacity-90"
+                style={{ background: '#0B0E14' }}
+              >
+                Request a Demo
+              </Link>
+            </div>
+            <div className="flex items-center gap-2 text-sm text-gray-400">
+              <i className="ti ti-circle-check text-green-500 text-base" aria-hidden="true" />
+              Trusted by engineering teams at Artemis Labs, Orion Studios, and FluxApps
+            </div>
+          </div>
+
+          <div className="relative">
+            <KanbanMockup />
+          </div>
+        </div>
+
+        {/* Small feature highlights */}
+        <div className="grid sm:grid-cols-3 gap-4 mt-14">
+          {highlightFeatures.map(({ icon, iconColor, title, description }) => (
+            <div
+              key={title}
+              className="rounded-xl p-4 flex gap-3"
+              style={{ background: '#0B0E14', border: '1px solid #1F2937' }}
+            >
+              <div
+                className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 text-lg"
+                style={{ background: `${iconColor}20`, color: iconColor }}
+              >
+                <i className={`ti ${icon}`} aria-hidden="true" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-white mb-0.5">{title}</p>
+                <p className="text-[12px] text-gray-500 leading-relaxed">{description}</p>
+              </div>
+            </div>
           ))}
         </div>
       </section>
 
-      <div style={{ borderTop: '0.5px solid #e4e4e7' }} />
+      {/* Features + Dashboard */}
+      <section id="features" className="max-w-7xl mx-auto px-6 pb-20 w-full">
+        <div className="grid lg:grid-cols-[1fr_340px] gap-8 items-start">
+          <div className="grid sm:grid-cols-3 gap-4">
+            {detailedFeatures.map(({ icon, iconColor, title, description }) => (
+              <div
+                key={title}
+                className="rounded-xl p-5 flex flex-col"
+                style={{ background: '#0B0E14', border: '1px solid #1F2937' }}
+              >
+                <div
+                  className="w-10 h-10 rounded-lg flex items-center justify-center text-xl mb-4"
+                  style={{ background: `${iconColor}20`, color: iconColor }}
+                >
+                  <i className={`ti ${icon}`} aria-hidden="true" />
+                </div>
+                <p className="text-sm font-bold text-white mb-2">{title}</p>
+                <p className="text-[12px] text-gray-500 leading-relaxed">{description}</p>
+              </div>
+            ))}
+          </div>
 
-      {/* CTA */}
-      <section className="py-16 px-6 flex justify-center" style={{ background: '#f4f4f6' }}>
-        <Card
-          className="w-full max-w-[480px] rounded-2xl text-center px-8 py-12 bg-white"
-          style={{ border: '0.5px solid #e4e4e7' }}
-        >
-          <h2 className="text-[26px] font-semibold text-[#0f172a] mb-2.5" style={{ letterSpacing: '-0.5px' }}>
-            Ready to get started?
-          </h2>
-          <p className="text-sm text-slate-500 leading-[1.7] mb-6">
-            Create your workspace in seconds.
-            <br />
-            No setup, no complexity, no credit card.
-          </p>
-          <Button size="lg" asChild
-            className="rounded-[9px] px-8 text-sm font-medium"
-            style={{ background: '#2563eb', color: '#fff', border: 'none' }}
-          >
-            <Link href="/register">Create your workspace</Link>
-          </Button>
-        </Card>
+          <div className="lg:sticky lg:top-24">
+            <DashboardPanel />
+          </div>
+        </div>
       </section>
 
-      <div style={{ borderTop: '0.5px solid #e4e4e7' }} />
-
       {/* Footer */}
-      <footer className="flex items-center justify-between flex-wrap gap-3 px-8 py-5 bg-white">
-        <div className="flex items-center gap-2">
-          <div
-            className="w-[18px] h-[18px] rounded-[5px] flex items-center justify-center text-white font-bold"
-            style={{ background: '#2563eb', fontSize: '9px' }}
-          >
-            C
+      <footer style={{ background: '#0B0E14' }}>
+        <div className="max-w-7xl mx-auto px-6 pt-14 pb-8">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-10 mb-12">
+            <div className="lg:col-span-2">
+              <div className="mb-4">
+                <div className="flex items-center gap-2.5">
+                  <div
+                    className="w-[28px] h-[28px] rounded-lg flex items-center justify-center text-white shrink-0"
+                    style={{ background: '#7C3AED' }}
+                  >
+                    <i className="ti ti-users text-xs" aria-hidden="true" />
+                  </div>
+                  <span className="text-base font-bold text-white">Syncro</span>
+                </div>
+              </div>
+              <p className="text-sm text-gray-500 leading-relaxed max-w-[280px]">
+                The collaborative workspace built for engineering teams who ship fast
+                and stay in sync.
+              </p>
+            </div>
+
+            {Object.entries(footerLinks).map(([heading, links]) => (
+              <div key={heading}>
+                <p className="text-sm font-semibold text-white mb-4">{heading}</p>
+                <ul className="flex flex-col gap-2.5">
+                  {links.map((link) => (
+                    <li key={link}>
+                      <a
+                        href="#"
+                        className="text-sm text-gray-500 hover:text-gray-300 transition-colors"
+                      >
+                        {link}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
           </div>
-          <span className="text-xs font-medium text-zinc-500">CollabPM</span>
-        </div>
-        <p className="text-[11px] text-zinc-400">
-          © {new Date().getFullYear()} CollabPM. All rights reserved.
-        </p>
-        <div className="flex gap-4">
-          <Link href="/login" className="text-xs text-zinc-400 hover:text-zinc-600 transition-colors">
-            Sign in
-          </Link>
-          <Link href="/register" className="text-xs text-zinc-400 hover:text-zinc-600 transition-colors">
-            Register
-          </Link>
+
+          <div
+            className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-6"
+            style={{ borderTop: '1px solid #1F2937' }}
+          >
+            <p className="text-xs text-gray-600">
+              © {new Date().getFullYear()} Syncro, Inc. All rights reserved.
+            </p>
+            <div className="flex items-center gap-4">
+              {['ti-brand-twitter', 'ti-brand-github', 'ti-brand-linkedin'].map((icon) => (
+                <a
+                  key={icon}
+                  href="#"
+                  className="text-gray-600 hover:text-gray-400 transition-colors"
+                  aria-label={icon.replace('ti-brand-', '')}
+                >
+                  <i className={`ti ${icon} text-lg`} aria-hidden="true" />
+                </a>
+              ))}
+            </div>
+          </div>
         </div>
       </footer>
 

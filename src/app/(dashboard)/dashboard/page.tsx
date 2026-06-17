@@ -104,11 +104,11 @@ export default async function DashboardPage() {
     <main className="flex-1 p-8">
       {/* Header */}
       <div className="mb-8">
-        <p className="text-sm text-zinc-400 font-medium mb-1">{greeting}</p>
-        <h1 className="text-2xl font-semibold text-zinc-900 tracking-tight">
+        <p className="text-sm text-muted-foreground font-medium mb-1">{greeting}</p>
+        <h1 className="text-2xl font-semibold text-foreground tracking-tight">
           {firstName} 👋
         </h1>
-        <p className="text-zinc-500 text-sm mt-1">
+        <p className="text-muted-foreground text-sm mt-1">
           Here is what is happening in your workspace today.
         </p>
       </div>
@@ -117,7 +117,7 @@ export default async function DashboardPage() {
 
       {/* Stats + Deadlines row */}
       <section className="mb-10">
-        <p className="text-xs font-semibold uppercase tracking-widest text-zinc-400 mb-4">
+        <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-4">
           Overview
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -133,7 +133,7 @@ export default async function DashboardPage() {
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs text-zinc-400">{description}</span>
+                    <span className="text-xs text-muted-foreground">{description}</span>
                     <Link
                       href={href}
                       className={`text-xs font-medium ${accent} hover:opacity-70 transition-opacity`}
@@ -148,12 +148,12 @@ export default async function DashboardPage() {
                         <Link
                           key={project.id}
                           href={`/projects/${project.id}`}
-                          className="block rounded-xl bg-zinc-50 px-3 py-2 hover:bg-zinc-100 transition-colors"
+                          className="block rounded-xl bg-muted/70 px-3 py-2 hover:bg-muted/80 transition-colors"
                         >
-                          <p className="text-xs font-semibold text-zinc-900 truncate">
+                          <p className="text-xs font-semibold text-foreground truncate">
                             {project.name}
                           </p>
-                          <p className="text-[10px] text-zinc-500 truncate">
+                          <p className="text-[10px] text-muted-foreground truncate">
                             {project.status} · {project.members.length} members
                           </p>
                         </Link>
@@ -167,12 +167,12 @@ export default async function DashboardPage() {
                         <Link
                           key={task.id}
                           href={`/tasks/${task.id}`}
-                          className="block rounded-xl bg-zinc-50 px-3 py-2 hover:bg-zinc-100 transition-colors"
+                          className="block rounded-xl bg-muted/70 px-3 py-2 hover:bg-muted/80 transition-colors"
                         >
-                          <p className="text-xs font-semibold text-zinc-900 truncate">
+                          <p className="text-xs font-semibold text-foreground truncate">
                             {task.title}
                           </p>
-                          <p className="text-[10px] text-zinc-500 truncate">
+                          <p className="text-[10px] text-muted-foreground truncate">
                             {task.project.name}
                           </p>
                         </Link>
@@ -185,15 +185,15 @@ export default async function DashboardPage() {
           )}
 
           {/* Upcoming deadlines card */}
-          <Card className="border border-zinc-100 row-span-1">
+          <Card className="border border-border row-span-1">
             <CardHeader className="pb-2">
               <CardDescription>Upcoming Deadlines</CardDescription>
-              <CardTitle className="text-sm font-semibold text-zinc-700">
+              <CardTitle className="text-sm font-semibold text-foreground">
                 {deadlines.length} upcoming
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-0">
-              <div className="flex flex-col divide-y divide-zinc-50">
+              <div className="flex flex-col divide-y divide-border">
                 {deadlines.slice(0, 3).map((item) => {
                   const { label, urgent } = formatDueDate(item.dueDate);
                   return (
@@ -202,18 +202,18 @@ export default async function DashboardPage() {
                       href={item.taskHref}
                       className="py-2.5 first:pt-0 last:pb-0 block hover:opacity-70 transition-opacity"
                     >
-                      <p className="text-xs font-medium text-zinc-800 leading-snug mb-0.5 truncate">
+                      <p className="text-xs font-medium text-foreground leading-snug mb-0.5 truncate">
                         {item.title}
                       </p>
                       <div className="flex items-center justify-between gap-2">
-                        <span className="text-[11px] text-zinc-400 truncate">
+                        <span className="text-[11px] text-muted-foreground truncate">
                           {item.project}
                         </span>
                         <span
                           className={`text-[10px] font-medium shrink-0 px-1.5 py-0.5 rounded-full ${
                             urgent
                               ? "bg-red-50 text-red-500"
-                              : "bg-zinc-100 text-zinc-500"
+                              : "bg-muted/60 text-muted-foreground"
                           }`}
                         >
                           {label}
@@ -229,7 +229,7 @@ export default async function DashboardPage() {
                   <Separator className="my-2" />
                   <Link
                     href="/projects"
-                    className="flex items-center justify-center gap-1 w-full pt-1 text-[11px] font-medium text-zinc-400 hover:text-zinc-600 transition-colors"
+                    className="flex items-center justify-center gap-1 w-full pt-1 text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors"
                   >
                     <span>+{deadlines.length - 3} more</span>
                     <span>→</span>
@@ -243,14 +243,14 @@ export default async function DashboardPage() {
 
       {/* Quick Actions */}
       <section>
-        <p className="text-xs font-semibold uppercase tracking-widest text-zinc-400 mb-4">
+        <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-4">
           Quick Actions
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {quickActions.map(({ label, description, href }) => (
             <Card
               key={label}
-              className="border border-zinc-200 hover:border-zinc-300 hover:shadow-sm transition-all duration-150"
+              className="border border-border hover:border-primary/30 hover:shadow-sm transition-all duration-150"
             >
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm font-semibold">{label}</CardTitle>
@@ -262,7 +262,7 @@ export default async function DashboardPage() {
                 <Button
                   asChild
                   size="sm"
-                  className="w-full bg-zinc-900 hover:bg-zinc-700 text-white"
+                  className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
                 >
                   <Link href={href}>+ {label}</Link>
                 </Button>

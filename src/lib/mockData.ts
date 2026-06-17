@@ -82,7 +82,7 @@ export const mockTasks: Record<string, TaskMock> = {
     createdAt: 'Jun 5, 2026',
     project: { id: 'proj-1', name: 'CollabPM Redesign' },
     assignees: [mockUsers.u3],
-    tags: [{ label: 'Backend', color: 'bg-blue-50 text-blue-600' }],
+    tags: [{ label: 'Backend', color: 'bg-primary/10 text-primary' }],
   },
   't2': {
     id: 't2',
@@ -94,7 +94,7 @@ export const mockTasks: Record<string, TaskMock> = {
     createdAt: 'Jun 5, 2026',
     project: { id: 'proj-3', name: 'Mobile App' },
     assignees: [mockUsers.u2],
-    tags: [{ label: 'Design', color: 'bg-amber-50 text-amber-600' }],
+    tags: [{ label: 'Design', color: 'bg-amber-500/15 text-amber-300' }],
   },
   't3': {
     id: 't3',
@@ -106,7 +106,7 @@ export const mockTasks: Record<string, TaskMock> = {
     createdAt: 'Jun 5, 2026',
     project: { id: 'proj-1', name: 'CollabPM Redesign' },
     assignees: [mockUsers.u1, mockUsers.u2],
-    tags: [{ label: 'Frontend', color: 'bg-amber-50 text-amber-600' }],
+    tags: [{ label: 'Frontend', color: 'bg-amber-500/15 text-amber-300' }],
   },
   't4': {
     id: 't4',
@@ -118,7 +118,7 @@ export const mockTasks: Record<string, TaskMock> = {
     createdAt: 'Jun 5, 2026',
     project: { id: 'proj-2', name: 'API Integration' },
     assignees: [mockUsers.u1],
-    tags: [{ label: 'Auth', color: 'bg-blue-50 text-blue-600' }],
+    tags: [{ label: 'Auth', color: 'bg-primary/10 text-primary' }],
   },
   't5': {
     id: 't5',
@@ -130,7 +130,7 @@ export const mockTasks: Record<string, TaskMock> = {
     createdAt: 'Jun 1, 2026',
     project: { id: 'proj-1', name: 'CollabPM Redesign' },
     assignees: [mockUsers.u1],
-    tags: [{ label: 'Core', color: 'bg-green-50 text-green-700' }],
+    tags: [{ label: 'Core', color: 'bg-green-500/15 text-green-300' }],
   },
   't6': {
     id: 't6',
@@ -142,6 +142,6 @@ export const mockTasks: Record<string, TaskMock> = {
     createdAt: 'Jun 1, 2026',
     project: { id: 'proj-1', name: 'CollabPM Redesign' },
     assignees: [mockUsers.u3],
-    tags: [{ label: 'Core', color: 'bg-green-50 text-green-700' }],
+    tags: [{ label: 'Core', color: 'bg-green-500/15 text-green-300' }],
   },
 }

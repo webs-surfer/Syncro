@@ -1,162 +1,121 @@
-"use client";
+'use client'
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
-import { Button } from "@/components/ui/button";
-import Link from "next/link";
-import { mockProjects, mockTasks } from "@/lib/mockData";
+import { FormEvent, useMemo, useState } from 'react'
+import { Button } from '@/components/ui/button'
+import Link from 'next/link'
+import { useTaskStore, useProjectOptions, type TaskStatus, type StoreTask } from '@/lib/taskStore'
 
-type TaskStatus = "todo" | "in_progress" | "done";
-
-type ProjectOption = {
-  id: string;
-  name: string;
-};
-
-interface Task {
-  id: string;
-  title: string;
-  project: string;
-  projectId: string;
-  dueDate?: string;
-  tags: { label: string; color: string }[];
-}
-
-const allMockTasks = Object.values(mockTasks);
-
-const initialTasks: Record<TaskStatus, Task[]> = {
-  todo: allMockTasks
-    .filter((t) => t.status === "todo")
-    .map((t) => ({
-      id: t.id,
-      title: t.title,
-      project: t.project.name,
-      projectId: t.project.id,
-      dueDate: t.dueDate,
-      tags: t.tags,
-    })),
-  in_progress: allMockTasks
-    .filter((t) => t.status === "in_progress")
-    .map((t) => ({
-      id: t.id,
-      title: t.title,
-      project: t.project.name,
-      projectId: t.project.id,
-      dueDate: t.dueDate,
-      tags: t.tags,
-    })),
-  done: allMockTasks
-    .filter((t) => t.status === "done")
-    .map((t) => ({
-      id: t.id,
-      title: t.title,
-      project: t.project.name,
-      projectId: t.project.id,
-      dueDate: t.dueDate,
-      tags: t.tags,
-    })),
-};
+// ── Constants ─────────────────────────────────────────────────────────────────
 
 const columns: { key: TaskStatus; label: string }[] = [
-  { key: "todo", label: "Todo" },
-  { key: "in_progress", label: "In Progress" },
-  { key: "done", label: "Done" },
-];
+  { key: 'todo', label: 'Todo' },
+  { key: 'in_progress', label: 'In Progress' },
+  { key: 'done', label: 'Done' },
+]
 
 const colAccent: Record<TaskStatus, string> = {
-  todo: "bg-slate-100 text-slate-500",
-  in_progress: "bg-blue-50 text-blue-600",
-  done: "bg-green-50 text-green-700",
-};
+  todo: 'bg-muted text-muted-foreground',
+  in_progress: 'bg-primary/10 text-primary',
+  done: 'bg-green-500/15 text-green-300',
+}
 
-const STORAGE_KEY = "collabpm-tasks";
+// ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function TasksPage() {
-  const [tasks, setTasks] = useState<Record<TaskStatus, Task[]>>(() => {
-    if (typeof window === "undefined") return initialTasks;
-    const stored = window.localStorage.getItem(STORAGE_KEY);
-    if (!stored) return initialTasks;
+  const { tasks, addTask, updateTaskStatus } = useTaskStore()
+  const projectOptions = useProjectOptions()
 
-    try {
-      const parsed = JSON.parse(stored) as Record<TaskStatus, Task[]>;
-      if (parsed && typeof parsed === "object") {
-        return parsed;
-      }
-    } catch (error) {
-      console.warn("Failed to parse stored tasks", error);
-    }
-    return initialTasks;
-  });
-  const [dragging, setDragging] = useState<{
-    task: Task;
-    from: TaskStatus;
-  } | null>(null);
-  const [dragOver, setDragOver] = useState<TaskStatus | null>(null);
-  const [showCreate, setShowCreate] = useState(false);
-  const [title, setTitle] = useState("");
-  const [projectId, setProjectId] = useState(Object.values(mockProjects)[0]?.id || "");
-  const [dueDate, setDueDate] = useState("");
-  const [status, setStatus] = useState<TaskStatus>("todo");
+  const [dragging, setDragging] = useState<{ task: StoreTask; from: TaskStatus } | null>(null)
+  const [dragOver, setDragOver] = useState<TaskStatus | null>(null)
 
-  const projectOptions = useMemo<ProjectOption[]>(
-    () => Object.values(mockProjects).map((project) => ({ id: project.id, name: project.name })),
-    [],
-  );
+  // Create form state
+  const [showCreate, setShowCreate] = useState(false)
+  const [title, setTitle] = useState('')
+  const [projectId, setProjectId] = useState(projectOptions[0]?.id || '')
+  const [dueDate, setDueDate] = useState('')
+  const [status, setStatus] = useState<TaskStatus>('todo')
 
-  useEffect(() => {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
-  }, [tasks]);
+  // Group tasks by status
+  const tasksByStatus = useMemo<Record<TaskStatus, StoreTask[]>>(
+    () => ({
+      todo: tasks.filter((t) => t.status === 'todo'),
+      in_progress: tasks.filter((t) => t.status === 'in_progress'),
+      done: tasks.filter((t) => t.status === 'done'),
+    }),
+    [tasks],
+  )
 
-  function onDragStart(task: Task, from: TaskStatus) {
-    setDragging({ task, from });
+  // ── Drag handlers ────────────────────────────────────────────────────────────
+
+  function onDragStart(task: StoreTask, from: TaskStatus) {
+    setDragging({ task, from })
   }
 
   function onDrop(to: TaskStatus) {
     if (!dragging || dragging.from === to) {
-      setDragging(null);
-      setDragOver(null);
-      return;
+      setDragging(null)
+      setDragOver(null)
+      return
     }
-    setTasks((prev) => ({
-      ...prev,
-      [dragging.from]: prev[dragging.from].filter((t) => t.id !== dragging.task.id),
-      [to]: [...prev[to], { ...dragging.task }],
-    }));
-    setDragging(null);
-    setDragOver(null);
+    updateTaskStatus(dragging.task.id, to)
+    setDragging(null)
+    setDragOver(null)
   }
+
+  // ── Create task ──────────────────────────────────────────────────────────────
 
   function handleCreateTask(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!title.trim() || !projectId) return;
+    event.preventDefault()
+    if (!title.trim() || !projectId) return
 
-    const project = projectOptions.find((p) => p.id === projectId);
-    const nextTask: Task = {
-      id: `t${Date.now()}`,
+    const project = projectOptions.find((p) => p.id === projectId)
+
+    addTask({
       title: title.trim(),
-      project: project?.name ?? "Unknown project",
-      projectId,
+      description: '',
+      status,
+      priority: 'medium',
       dueDate: dueDate || undefined,
-      tags: [{ label: status === "done" ? "Done" : status === "in_progress" ? "In Progress" : "Todo", color: status === "done" ? "bg-green-50 text-green-700" : status === "in_progress" ? "bg-blue-50 text-blue-600" : "bg-slate-100 text-slate-500" }],
-    };
+      projectId,
+      projectName: project?.name ?? 'Unknown project',
+      tags: [
+        {
+          label:
+            status === 'done'
+              ? 'Done'
+              : status === 'in_progress'
+              ? 'In Progress'
+              : 'Todo',
+          color:
+            status === 'done'
+              ? 'bg-emerald-500/15 text-emerald-300'
+              : status === 'in_progress'
+              ? 'bg-sky-500/15 text-sky-300'
+              : 'bg-muted/20 text-muted-foreground',
+        },
+      ],
+      assignees: [],
+    })
 
-    setTasks((prev) => ({
-      ...prev,
-      [status]: [nextTask, ...prev[status]],
-    }));
-    setTitle("");
-    setDueDate("");
-    setStatus("todo");
-    setProjectId(projectOptions[0]?.id || "");
-    setShowCreate(false);
+    // Reset form
+    setTitle('')
+    setDueDate('')
+    setStatus('todo')
+    setProjectId(projectOptions[0]?.id || '')
+    setShowCreate(false)
   }
+
+  // ── Render ───────────────────────────────────────────────────────────────────
 
   return (
     <main className="flex-1 p-8">
       {/* Header */}
       <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between mb-2">
         <div>
-          <h1 className="text-xl font-semibold text-slate-900 tracking-tight">My Tasks</h1>
-          <p className="text-sm text-slate-500 mt-1">
+          <h1 className="text-xl font-semibold text-foreground tracking-tight">
+            My Tasks
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1">
             Tasks assigned to you across all projects
           </p>
         </div>
@@ -168,48 +127,52 @@ export default function TasksPage() {
         </Button>
       </div>
 
+      {/* Create task form */}
       {showCreate && (
-        <section className="mb-6 rounded-[18px] border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="text-sm font-semibold text-slate-900 mb-3">Add a new task</h2>
+        <section className="mb-6 rounded-[18px] border border-border bg-card p-6 shadow-sm">
+          <h2 className="text-sm font-semibold text-foreground mb-3">
+            Add a new task
+          </h2>
           <form onSubmit={handleCreateTask} className="grid gap-4 md:grid-cols-2">
-            <label className="flex flex-col text-sm text-slate-700">
+            <label className="flex flex-col text-sm text-muted-foreground">
               Task title
               <input
                 value={title}
-                onChange={(event) => setTitle(event.target.value)}
-                className="mt-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+                onChange={(e) => setTitle(e.target.value)}
+                required
+                className="mt-2 rounded-lg border border-border bg-background text-foreground px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/30"
                 placeholder="Task name"
               />
             </label>
-            <label className="flex flex-col text-sm text-slate-700">
+            <label className="flex flex-col text-sm text-muted-foreground">
               Project
               <select
                 value={projectId}
-                onChange={(event) => setProjectId(event.target.value)}
-                className="mt-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+                onChange={(e) => setProjectId(e.target.value)}
+                className="mt-2 rounded-lg border border-border bg-background text-foreground px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/30"
               >
-                {projectOptions.map((project) => (
-                  <option key={project.id} value={project.id}>
-                    {project.name}
+                {projectOptions.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
                   </option>
                 ))}
               </select>
             </label>
-            <label className="flex flex-col text-sm text-slate-700">
+            <label className="flex flex-col text-sm text-muted-foreground">
               Due date
               <input
                 type="date"
                 value={dueDate}
-                onChange={(event) => setDueDate(event.target.value)}
-                className="mt-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+                onChange={(e) => setDueDate(e.target.value)}
+                className="mt-2 rounded-lg border border-border bg-background text-foreground px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/30"
               />
             </label>
-            <label className="flex flex-col text-sm text-slate-700">
+            <label className="flex flex-col text-sm text-muted-foreground">
               Status
               <select
                 value={status}
-                onChange={(event) => setStatus(event.target.value as TaskStatus)}
-                className="mt-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+                onChange={(e) => setStatus(e.target.value as TaskStatus)}
+                className="mt-2 rounded-lg border border-border bg-background text-foreground px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/30"
               >
                 <option value="todo">Todo</option>
                 <option value="in_progress">In Progress</option>
@@ -226,7 +189,7 @@ export default function TasksPage() {
       )}
 
       {/* Info note */}
-      <p className="text-xs text-slate-400 mb-6">
+      <p className="text-xs text-muted-foreground mb-6">
         Drag tasks between columns to update status — changes sync to the project board automatically.
       </p>
 
@@ -235,53 +198,49 @@ export default function TasksPage() {
         {columns.map(({ key, label }) => (
           <div
             key={key}
-            className="rounded-xl p-3 transition-colors"
-            style={{
-              background: dragOver === key ? "#eff6ff" : "#f4f4f6",
-              border:
-                dragOver === key
-                  ? "0.5px solid #93c5fd"
-                  : "0.5px solid #e4e4e7",
-            }}
+            className={`rounded-xl p-3 transition-colors ${
+              dragOver === key ? 'bg-primary/10 border border-primary/30' : 'bg-muted/50 border border-border'
+            }`}
             onDragOver={(e) => {
-              e.preventDefault();
-              setDragOver(key);
+              e.preventDefault()
+              setDragOver(key)
             }}
             onDragLeave={() => setDragOver(null)}
             onDrop={() => onDrop(key)}
           >
             {/* Column header */}
             <div className="flex items-center justify-between mb-3 px-1">
-              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 {label}
               </span>
-              <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${colAccent[key]}`}>
-                {tasks[key].length}
+              <span
+                className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${colAccent[key]}`}
+              >
+                {tasksByStatus[key].length}
               </span>
             </div>
 
             {/* Task cards */}
             <div className="flex flex-col gap-2 min-h-20">
-              {tasks[key].map((task) => (
+              {tasksByStatus[key].map((task) => (
                 <Link
                   key={task.id}
                   href={`/tasks/${task.id}`}
                   draggable
                   onDragStart={(e) => {
-                    e.stopPropagation();
-                    onDragStart(task, key);
+                    e.stopPropagation()
+                    onDragStart(task, key)
                   }}
-                  className="block bg-white rounded-[10px] p-3 cursor-grab active:cursor-grabbing select-none hover:border-blue-200 transition-colors"
-                  style={{ border: "0.5px solid #e4e4e7" }}
+                  className="block rounded-[10px] p-3 cursor-grab active:cursor-grabbing select-none hover:border-primary/30 transition-colors bg-card border border-border"
                   onClick={(e) => dragging && e.preventDefault()}
                 >
-                  <p className="text-sm font-medium text-slate-800 mb-2 leading-snug">
+                  <p className="text-sm font-medium text-foreground mb-2 leading-snug">
                     {task.title}
                   </p>
 
                   {/* Project name */}
-                  <p className="text-[11px] text-slate-400 mb-2 truncate">
-                    📁 {task.project}
+                  <p className="text-[11px] text-muted-foreground mb-2 truncate">
+                    📁 {task.projectName}
                   </p>
 
                   <div className="flex items-center justify-between gap-2">
@@ -299,7 +258,7 @@ export default function TasksPage() {
 
                     {/* Due date */}
                     {task.dueDate && (
-                      <span className="text-[10px] text-slate-400 shrink-0">
+                      <span className="text-[10px] text-muted-foreground shrink-0">
                         {task.dueDate}
                       </span>
                     )}
@@ -309,10 +268,10 @@ export default function TasksPage() {
             </div>
 
             <button
-              className="w-full mt-2 py-2 rounded-lg text-xs text-slate-400 hover:text-slate-600 hover:bg-white/70 transition-colors text-left px-2"
+              className="w-full mt-2 py-2 rounded-lg text-xs text-muted-foreground hover:text-foreground hover:bg-muted/70 transition-colors text-left px-2"
               onClick={() => {
-                setShowCreate(true);
-                setStatus(key);
+                setStatus(key)
+                setShowCreate(true)
               }}
             >
               + Add task
@@ -321,5 +280,5 @@ export default function TasksPage() {
         ))}
       </div>
     </main>
-  );
+  )
 }

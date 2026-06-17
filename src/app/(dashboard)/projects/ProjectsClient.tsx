@@ -23,9 +23,9 @@ const initialProjects = Object.values(mockProjects)
 const STORAGE_KEY = 'collabpm-projects'
 
 const priorityStyles: Record<Priority, string> = {
-  high: 'bg-red-50 text-red-600',
-  medium: 'bg-amber-50 text-amber-600',
-  low: 'bg-green-50 text-green-700',
+  high: 'bg-red-500/15 text-red-300',
+  medium: 'bg-amber-500/15 text-amber-300',
+  low: 'bg-green-500/15 text-green-300',
 }
 
 export default function ProjectsClient() {
@@ -90,8 +90,8 @@ export default function ProjectsClient() {
     <main className="flex-1 p-8">
       <div className="flex flex-col gap-6 mb-8 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-slate-900 tracking-tight">Projects</h1>
-          <p className="text-sm text-slate-500 mt-1">Manage and track all your team projects</p>
+          <h1 className="text-xl font-semibold text-foreground tracking-tight">Projects</h1>
+          <p className="text-sm text-muted-foreground mt-1">Manage and track all your team projects</p>
         </div>
         <Button onClick={() => setShowCreate((prev) => !prev)} className="text-sm font-medium rounded-lg">
           {showCreate ? 'Cancel' : '+ New project'}
@@ -99,45 +99,45 @@ export default function ProjectsClient() {
       </div>
 
       {showCreate && (
-        <section className="mb-8 rounded-[18px] border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="text-sm font-semibold text-slate-900 mb-3">Create a new project</h2>
+        <section className="mb-8 rounded-[18px] border border-border bg-card p-6 shadow-sm">
+          <h2 className="text-sm font-semibold text-foreground mb-3">Create a new project</h2>
           <form onSubmit={handleCreateProject} className="grid gap-4 sm:grid-cols-2">
-            <label className="flex flex-col text-sm text-slate-700">
+            <label className="flex flex-col text-sm text-muted-foreground">
               Project name
               <input
                 value={name}
                 onChange={(event) => setName(event.target.value)}
-                className="mt-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+                className="mt-2 rounded-lg border border-border bg-background text-foreground px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/30"
                 placeholder="E.g. Marketing launch"
               />
             </label>
-            <label className="flex flex-col text-sm text-slate-700">
+            <label className="flex flex-col text-sm text-muted-foreground">
               Description
               <textarea
                 value={description}
                 onChange={(event) => setDescription(event.target.value)}
-                className="mt-2 min-h-30 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+                className="mt-2 min-h-30 rounded-lg border border-border bg-background text-foreground px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/30"
                 placeholder="Short summary of this project"
               />
             </label>
-            <label className="flex flex-col text-sm text-slate-700">
+            <label className="flex flex-col text-sm text-muted-foreground">
               Priority
               <select
                 value={priority}
                 onChange={(event) => setPriority(event.target.value as Priority)}
-                className="mt-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+                className="mt-2 rounded-lg border border-border bg-background text-foreground px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/30"
               >
                 <option value="high">High</option>
                 <option value="medium">Medium</option>
                 <option value="low">Low</option>
               </select>
             </label>
-            <label className="flex flex-col text-sm text-slate-700">
+            <label className="flex flex-col text-sm text-muted-foreground">
               Status
               <select
                 value={status}
                 onChange={(event) => setStatus(event.target.value as Status)}
-                className="mt-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+                className="mt-2 rounded-lg border border-border bg-background text-foreground px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/30"
               >
                 <option value="active">Active</option>
                 <option value="paused">Paused</option>
@@ -153,7 +153,7 @@ export default function ProjectsClient() {
         </section>
       )}
 
-      <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-4">
+      <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-4">
         {projectCount > 0 ? `All projects · ${projectCount}` : 'No projects yet'}
       </p>
 
@@ -162,8 +162,7 @@ export default function ProjectsClient() {
           <Link
             key={project.id}
             href={`/projects/${project.id}`}
-            className="bg-white rounded-[14px] flex flex-col gap-4 p-5 transition-colors hover:border-blue-200"
-            style={{ border: '0.5px solid #e4e4e7' }}
+            className="rounded-[14px] flex flex-col gap-4 p-5 transition-colors border border-border bg-card hover:border-primary/30"
           >
             <div className="flex items-start justify-between gap-2">
               <div className="flex items-start gap-2">
@@ -171,7 +170,7 @@ export default function ProjectsClient() {
                   className="w-2.5 h-2.5 rounded-full mt-1 shrink-0"
                   style={{ background: project.color }}
                 />
-                <span className="text-sm font-semibold text-slate-900 leading-snug">
+                <span className="text-sm font-semibold text-foreground leading-snug">
                   {project.name}
                 </span>
               </div>
@@ -181,8 +180,8 @@ export default function ProjectsClient() {
                 {project.priority}
               </span>
             </div>
-            <p className="text-xs text-slate-500 leading-relaxed">{project.description}</p>
-            <div className="flex items-center justify-between text-[11px] text-slate-400">
+            <p className="text-xs text-muted-foreground leading-relaxed">{project.description}</p>
+            <div className="flex items-center justify-between text-[11px] text-muted-foreground">
               <span>{project.members.length} members</span>
               <span>{project.status}</span>
             </div>
@@ -192,7 +191,7 @@ export default function ProjectsClient() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <button
-          className="flex flex-col items-center justify-center gap-2 min-h-50 rounded-[14px] border border-dashed border-slate-300 bg-slate-50 text-slate-500 transition hover:border-slate-400"
+          className="flex flex-col items-center justify-center gap-2 min-h-50 rounded-[14px] border border-dashed border-border bg-muted text-muted-foreground transition hover:border-primary/30"
           onClick={() => setShowCreate(true)}
         >
           <span className="text-2xl">+</span>

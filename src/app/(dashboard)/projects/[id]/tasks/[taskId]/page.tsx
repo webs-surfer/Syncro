@@ -1,19 +1,19 @@
 'use client'
 
 import { useState, use } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { mockTasks } from '@/lib/mockData'
+import { useTaskStore, type TaskStatus } from '@/lib/taskStore'
 
-type TaskStatus = 'todo' | 'in_progress' | 'done'
+// ── Moved outside component ───────────────────────────────────────────────────
 
-// ── moved outside component ──────────────────────────────
 const statusStyles: Record<TaskStatus, string> = {
-  todo: 'bg-slate-100 text-slate-600',
-  in_progress: 'bg-blue-50 text-blue-600',
-  done: 'bg-green-50 text-green-700',
+  todo: 'bg-muted/70 text-muted-foreground',
+  in_progress: 'bg-primary/10 text-primary',
+  done: 'bg-green-500/15 text-green-300',
 }
 
 const statusLabels: Record<TaskStatus, string> = {
@@ -22,64 +22,83 @@ const statusLabels: Record<TaskStatus, string> = {
   done: 'Done',
 }
 
+// ── Page ──────────────────────────────────────────────────────────────────────
+
 export default function ProjectTaskDetailPage({
   params,
 }: {
   params: Promise<{ id: string; taskId: string }>
 }) {
+  const router = useRouter()
   const resolvedParams = use(params)
-  const task = mockTasks[resolvedParams.taskId as keyof typeof mockTasks]
+  const { tasks, updateTaskStatus } = useTaskStore()
 
-  const [status, setStatus] = useState<TaskStatus>(task?.status ?? 'todo')
+  const task = tasks.find((t) => t.id === resolvedParams.taskId)
+
   const [showStatusMenu, setShowStatusMenu] = useState(false)
 
   if (!task) {
     return (
       <main className="flex-1 p-8">
-        <p className="text-sm text-slate-500">Task not found.</p>
+        <button
+          onClick={() => router.back()}
+          className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors px-2.5 py-1.5 rounded-lg hover:bg-muted/50 mb-6"
+        >
+          ← Back
+        </button>
+        <p className="text-sm text-muted-foreground">Task not found.</p>
       </main>
     )
+  }
+
+  // Determine if the current user is an assignee (can change status)
+  const isAssigned = task.assignees.some((a) => a.isMe === true)
+
+  function handleStatusChange(s: TaskStatus) {
+    if (!isAssigned) return
+    updateTaskStatus(task!.id, s)
+    setShowStatusMenu(false)
   }
 
   return (
     <main className="flex-1 p-8 max-w-3xl">
 
-      {/* Breadcrumb */}
-      <div className="flex items-center gap-2 text-xs text-slate-400 mb-6 flex-wrap">
-        <Link href="/projects" className="hover:text-slate-600 transition-colors">
-          Projects
-        </Link>
-        <span>/</span>
-        <Link
-          href={`/projects/${task.project.id}`}
-          className="hover:text-slate-600 transition-colors"
+      {/* Back button + Breadcrumb */}
+      <div className="flex items-center gap-3 mb-6 flex-wrap">
+        <button
+          onClick={() => router.back()}
+          className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors px-2.5 py-1.5 rounded-lg hover:bg-muted/50"
         >
-          {task.project.name}
-        </Link>
-        <span>/</span>
-        <span className="text-slate-600 font-medium truncate">{task.title}</span>
+          ← Back
+        </button>
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <Link href="/projects" className="hover:text-foreground transition-colors">
+            Projects
+          </Link>
+          <span>/</span>
+          <Link
+            href={`/projects/${task.projectId}`}
+            className="hover:text-foreground transition-colors"
+          >
+            {task.projectName}
+          </Link>
+          <span>/</span>
+          <span className="text-foreground font-medium truncate">{task.title}</span>
+        </div>
       </div>
 
       {/* Title row */}
       <div className="flex items-start justify-between gap-4 mb-6">
-        <h1 className="text-xl font-semibold text-slate-900 tracking-tight leading-snug">
+        <h1 className="text-xl font-semibold text-foreground tracking-tight leading-snug">
           {task.title}
         </h1>
         <div className="flex items-center gap-2 shrink-0">
           <Link
             href={`/tasks/${task.id}`}
-            className="text-xs font-medium text-blue-600 hover:opacity-70 transition-opacity px-3 py-1.5 rounded-lg"
-            style={{ background: '#eff6ff', border: '0.5px solid #bfdbfe' }}
+            className="text-xs font-medium text-primary hover:opacity-70 transition-opacity px-3 py-1.5 rounded-lg bg-primary/10 border border-primary/30"
           >
             View in My Tasks →
           </Link>
-          <Button
-            variant="outline"
-            size="sm"
-            className="text-xs rounded-lg border-slate-200 text-slate-600"
-          >
-            Edit task
-          </Button>
         </div>
       </div>
 
@@ -91,26 +110,31 @@ export default function ProjectTaskDetailPage({
           {/* Description */}
           <Card style={{ border: '0.5px solid #e4e4e7' }}>
             <CardHeader className="pb-2">
-              <CardTitle className="text-xs font-semibold uppercase tracking-widest text-slate-400">
+              <CardTitle className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
                 Description
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-slate-600 leading-relaxed">{task.description}</p>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                {task.description || 'No description provided.'}
+              </p>
             </CardContent>
           </Card>
 
           {/* Assignees */}
           <Card style={{ border: '0.5px solid #e4e4e7' }}>
             <CardHeader className="pb-2">
-              <CardTitle className="text-xs font-semibold uppercase tracking-widest text-slate-400">
+              <CardTitle className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
                 Assignees
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="flex flex-col gap-3">
-                {task.assignees.map(a => (
-                  <div key={a.id} className="flex items-center justify-between">
+                {task.assignees.length === 0 && (
+                  <p className="text-xs text-muted-foreground">No assignees yet.</p>
+                )}
+                {task.assignees.map((a, i) => (
+                  <div key={a.id ?? i} className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div
                         className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
@@ -118,21 +142,17 @@ export default function ProjectTaskDetailPage({
                       >
                         {a.initials}
                       </div>
-                      <span className="text-sm text-slate-700 font-medium">{a.name}</span>
+                      <span className="text-sm text-foreground font-medium">
+                        {a.name}
+                      </span>
                     </div>
                     {a.isMe && (
-                      <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-blue-50 text-blue-600">
+                      <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-primary/10 text-primary">
                         You
                       </span>
                     )}
                   </div>
                 ))}
-                <button className="flex items-center gap-2 text-xs text-slate-400 hover:text-blue-600 transition-colors mt-1">
-                  <span className="w-8 h-8 rounded-full border border-dashed border-slate-300 flex items-center justify-center text-base leading-none">
-                    +
-                  </span>
-                  Add assignee
-                </button>
               </div>
             </CardContent>
           </Card>
@@ -145,28 +165,37 @@ export default function ProjectTaskDetailPage({
           {/* Status */}
           <Card style={{ border: '0.5px solid #e4e4e7' }}>
             <CardHeader className="pb-2">
-              <CardTitle className="text-xs font-semibold uppercase tracking-widest text-slate-400">
+              <CardTitle className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
                 Status
               </CardTitle>
             </CardHeader>
             <CardContent className="relative">
+              {/* Permission notice */}
+              {!isAssigned && (
+                <p className="text-[10px] text-amber-300 bg-amber-500/15 px-2 py-1 rounded-lg mb-2">
+                  Only assignees can change status
+                </p>
+              )}
               <button
-                onClick={() => setShowStatusMenu(!showStatusMenu)}
-                className={`w-full text-left text-xs font-semibold px-3 py-1.5 rounded-full ${statusStyles[status]}`}
+                onClick={() => isAssigned && setShowStatusMenu(!showStatusMenu)}
+                disabled={!isAssigned}
+                title={isAssigned ? 'Change status' : 'Only assignees can change status'}
+                className={`w-full text-left text-xs font-semibold px-3 py-1.5 rounded-full transition-colors ${statusStyles[task.status]} ${
+                  !isAssigned ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'
+                }`}
               >
-                {statusLabels[status]} ▾
+                {statusLabels[task.status]} {isAssigned ? '▾' : '🔒'}
               </button>
-              {showStatusMenu && (
+              {showStatusMenu && isAssigned && (
                 <div
-                  className="absolute top-10 left-0 right-0 mx-4 bg-white rounded-lg shadow-md z-10 overflow-hidden"
-                  style={{ border: '0.5px solid #e4e4e7' }}
+                  className="absolute top-10 left-0 right-0 mx-4 bg-card rounded-lg shadow-md z-10 overflow-hidden border border-border"
                 >
-                  {(Object.keys(statusLabels) as TaskStatus[]).map(s => (
+                  {(Object.keys(statusLabels) as TaskStatus[]).map((s) => (
                     <button
                       key={s}
-                      onClick={() => { setStatus(s); setShowStatusMenu(false) }}
-                      className={`w-full text-left px-3 py-2 text-xs font-medium hover:bg-slate-50 transition-colors ${
-                        status === s ? 'text-blue-600' : 'text-slate-600'
+                      onClick={() => handleStatusChange(s)}
+                      className={`w-full text-left px-3 py-2 text-xs font-medium hover:bg-muted/50 transition-colors ${
+                        task.status === s ? 'text-primary' : 'text-muted-foreground'
                       }`}
                     >
                       {statusLabels[s]}
@@ -180,16 +209,16 @@ export default function ProjectTaskDetailPage({
           {/* Project */}
           <Card style={{ border: '0.5px solid #e4e4e7' }}>
             <CardHeader className="pb-2">
-              <CardTitle className="text-xs font-semibold uppercase tracking-widest text-slate-400">
+              <CardTitle className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
                 Project
               </CardTitle>
             </CardHeader>
             <CardContent>
               <Link
-                href={`/projects/${task.project.id}`}
-                className="text-sm font-medium text-blue-600 hover:opacity-70 transition-opacity"
+                href={`/projects/${task.projectId}`}
+                className="text-sm font-medium text-primary hover:opacity-70 transition-opacity"
               >
-                ← {task.project.name}
+                ← {task.projectName}
               </Link>
             </CardContent>
           </Card>
@@ -197,30 +226,32 @@ export default function ProjectTaskDetailPage({
           {/* Due date */}
           <Card style={{ border: '0.5px solid #e4e4e7' }}>
             <CardHeader className="pb-2">
-              <CardTitle className="text-xs font-semibold uppercase tracking-widest text-slate-400">
+              <CardTitle className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
                 Due Date
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-sm font-medium text-slate-700">{task.dueDate}</p>
+              <p className="text-sm font-medium text-foreground">
+                {task.dueDate || '—'}
+              </p>
             </CardContent>
           </Card>
 
           {/* Created */}
           <Card style={{ border: '0.5px solid #e4e4e7' }}>
             <CardHeader className="pb-2">
-              <CardTitle className="text-xs font-semibold uppercase tracking-widest text-slate-400">
+              <CardTitle className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
                 Created
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-slate-500">{task.createdAt}</p>
+              <p className="text-sm text-muted-foreground">{task.createdAt}</p>
             </CardContent>
           </Card>
 
           <Separator />
 
-          <button className="text-xs font-medium text-red-400 hover:text-red-600 transition-colors text-left">
+          <button className="text-xs font-medium text-destructive hover:text-destructive/80 transition-colors text-left">
             Delete task
           </button>
 
