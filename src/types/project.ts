@@ -1,21 +1,19 @@
-export type ProjectStatus = 'active' | 'archived' | 'completed';
+import { 
+  Project as PrismaProject, 
+  ProjectStatus as PrismaProjectStatus 
+} from '@prisma/client';
 
-export interface Project {
-  id: string;
-  name: string;
-  description?: string;
-  status: ProjectStatus;
-  workspaceId: string;
-  createdById: string;
-  createdAt: Date;
-  updatedAt: Date;
-}
+export type ProjectStatus = PrismaProjectStatus;
+export type ProjectRole = 'OWNER' | 'ADMIN' | 'MEMBER';
+export type tasksStatus = 'TODO' | 'IN_PROGRESS' | 'DONE';
+
+export type Project = PrismaProject;
 
 export interface CreateProjectInput {
   name: string;
-  description?: string;
-  workspaceId: string;
-  createdById: string;
+  description: string;
+  status?: ProjectStatus;
+  ownerId: string;
 }
 
 export interface UpdateProjectInput {

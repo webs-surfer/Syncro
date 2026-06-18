@@ -18,6 +18,11 @@ enum TaskStatus {
   IN_PROGRESS
   DONE
 }
+enum ProjectStatus{
+  active
+  archived
+  completed
+}
 
 model User {
   id                 String          @id @default(cuid())
@@ -34,10 +39,11 @@ model User {
 model Project {
   id          String          @id @default(cuid())
   name        String
-  description String?
+  description String
   inviteCode  String          @unique
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
+  status      ProjectStatus   @default(active)
   members     ProjectMember[]
   tasks       Task[]
 }
