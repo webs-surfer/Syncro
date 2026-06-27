@@ -1,36 +1,216 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+Collaborative Project Management System
 
-## Getting Started
+A modern, collaborative software management platform inspired by tools like Jira, built with a production-oriented architecture and modern full-stack technologies. The project focuses on scalable backend design, authentication, authorization, and collaborative project/task management rather than being a simple CRUD application.
 
-First, run the development server:
+🚀 Current Progress
+✅ Authentication
+Clerk Authentication
+JWT-based API authentication for Postman
+User synchronization from Clerk to PostgreSQL
+Centralized AuthService for retrieving authenticated users
+✅ Database
+PostgreSQL (Neon)
+Prisma ORM
+Relational database design
+Database transactions for atomic operations
+✅ Project Management
+Create Project
+Generate unique invite code for every project
+Automatically assign creator as OWNER
+Fetch only projects the authenticated user is a member of
+🏗 Current Architecture
+Client
+   │
+   ▼
+API Routes
+   │
+   ▼
+Auth Service
+   │
+   ▼
+Business Services
+   │
+   ▼
+Prisma ORM
+   │
+   ▼
+PostgreSQL
+📂 Project Structure
+src/
+├── app/
+│   └── api/
+│       └── v1/
+├── services/
+│   ├── auth.service.ts
+│   └── project.service.ts
+├── lib/
+│   └── prisma.ts
+├── types/
+└── prisma/
+🛠 Tech Stack
+Frontend
+Next.js 15
+React 19
+TypeScript
+Tailwind CSS
+Backend
+Next.js Route Handlers
+TypeScript
+Prisma ORM
+Database
+PostgreSQL (Neon)
+Authentication
+Clerk
+JWT Verification
+Development
+Postman
+Prisma Studio
+Git & GitHub
+🗄 Database Design
+User
+User
+├── id
+├── clerkId
+├── email
+├── name
+└── imageUrl
+Project
+Project
+├── id
+├── name
+├── description
+├── inviteCode
+├── createdAt
+└── updatedAt
+ProjectMember
+ProjectMember
+├── id
+├── projectId
+├── userId
+├── role
+└── joinedAt
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+Role:
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+OWNER
+ADMIN
+MEMBER
+Relationships
+User
+   │
+   │
+   ▼
+ProjectMember
+   ▲
+   │
+Project
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+A project can have multiple members.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+A user can belong to multiple projects.
 
-## Learn More
+✅ Implemented APIs
+Create Project
+POST /api/v1/projects
 
-To learn more about Next.js, take a look at the following resources:
+Creates a new project and automatically assigns the creator as OWNER.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Get User Projects
+GET /api/v1/projects
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Returns only the projects where the authenticated user is a member.
 
-## Deploy on Vercel
+Authentication Flow
+User Login
+      │
+      ▼
+Clerk Authentication
+      │
+      ▼
+JWT Verification
+      │
+      ▼
+Database User
+      │
+      ▼
+Authorized API Request
+Project Creation Flow
+Authenticate User
+        │
+        ▼
+Verify JWT
+        │
+        ▼
+Find Database User
+        │
+        ▼
+Create Project
+        │
+        ▼
+Create OWNER Membership
+        │
+        ▼
+Commit Transaction
+Current Features
+Secure authentication
+Role-based project ownership
+Transactional project creation
+Member-based project access
+Layered backend architecture
+Service-based business logic
+Prisma ORM integration
+PostgreSQL relational database
+Upcoming Features
+Project
+Edit Project
+Delete Project
+Invite Members
+Join via Invite Link
+Task Management
+Create Task
+Update Task
+Delete Task
+Task Status
+Due Dates
+Task Assignment
+Labels
+Priority
+Comments
+Attachments
+Dashboard
+Project Overview
+Task Analytics
+Recent Activity
+Productivity Charts
+Collaboration
+Multiple Admins
+Member Permissions
+Activity Logs
+Real-time Updates
+Notifications
+Task Assignment Notifications
+Deadline Reminders
+Project Invitations
+Architecture Principles
+Layered Architecture
+Service-Oriented Design
+Separation of Concerns
+Centralized Authentication
+Transaction-Based Database Operations
+Role-Based Authorization
+Scalable Code Structure
+Current Development Status
+Module	Status
+Authentication	✅ Complete
+Database Setup	✅ Complete
+User Sync	✅ Complete
+Project Creation	✅ Complete
+Project Membership	✅ Complete
+Fetch User Projects	✅ Complete
+Task Module	🚧 In Progress
+Collaboration	⏳ Planned
+Dashboard Analytics	⏳ Planned
+Notifications	⏳ Planned
+🎯 Goal
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Build a production-grade collaborative project management platform that demonstrates real-world software engineering practices—including authentication, authorization, relational database design, scalable architecture, and collaborative workflows—using a modern TypeScript and Next.js stack. This project is being developed with a focus on placement readiness and showcasing industry-relevant engineering skills rather than replicating a basic tutorial application.
