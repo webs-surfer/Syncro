@@ -1,59 +1,75 @@
 import { NextResponse } from "next/server";
-
-import { verifyToken } from "@clerk/backend";
-
-import prisma from "@/lib/prisma";
 import { ProjectService } from "@/services/project.service";
+import { AuthService } from "@/services/auth.service";
 
 export async function POST(request: Request) {
   try {
+    // Extract the project details sent by the client in the request body.
+    // Example body:
+    // {
+    //   "name": "AI Dashboard",
+    //   "description": "Dashboard for analytics"
+    // }
     const { name, description } = await request.json();
-    const authHeader = request.headers.get("authorization");
-
-    if (!authHeader?.startsWith("Bearer ")) {
+    const user = await AuthService.getCurrentUser(request);
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const token = authHeader.replace("Bearer ", "");
-
-    const payload = await verifyToken(token, {
-      secretKey: process.env.CLERK_SECRET_KEY!,
-    });
-
-    const clerkUserId = payload.sub;
-
-    if (!clerkUserId) {
-      return NextResponse.json({ error: "Invalid token" }, { status: 401 });
-    }
-    const user = await prisma.user.findUnique({
-      where: {
-        clerkId: clerkUserId,
-      },
-    });
-    if (!user) {
-      return NextResponse.json(
-        { error: "User not found in database" },
-        { status: 404 },
-      );
-    }
+    // Create a new project.
+    // The currently authenticated user becomes the owner of the project.
     const project = await ProjectService.create({
       name: name,
       description: description,
       ownerId: user.id,
     });
+
+    // Return the newly created project to the client.
     return NextResponse.json({
       success: true,
       project,
     });
   } catch (error) {
+    // Catch any unexpected errors such as:
+    // - Invalid/expired JWT
+    // - Database connection issues
+    // - Prisma errors
+    // - Project creation failures
+
     console.error("PROJECT CREATE ERROR:", error);
 
+    // Return a generic 500 Internal Server Error response.
     return NextResponse.json(
       {
         success: false,
         error: error instanceof Error ? error.message : String(error),
       },
       { status: 500 },
+    );
+  }
+}
+export async function GET(request: Request) {
+  try {
+    //authorize user
+    const user = await AuthService.getCurrentUser(request);
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    //get projects in which user as member
+    const projects = await ProjectService.getUserProjects(user.id);
+
+    return NextResponse.json({
+      success: true,
+      projects,
+    });
+  } catch (error) {
+    console.log("error in fetching projects :", error);
+    return NextResponse.json(
+      {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      },
+      { status: 401 },
     );
   }
 }

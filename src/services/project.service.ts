@@ -9,7 +9,6 @@ export class ProjectService {
         data: {
           name: input.name,
           description: input.description,
-
           inviteCode,
         },
       });
@@ -27,16 +26,18 @@ export class ProjectService {
     return project as Project;
   }
 
-  static async getById(id: string): Promise<Project | null> {
-    // TODO: Implement with Prisma
-    throw new Error("Not implemented");
+  static async getUserProjects(userId: string): Promise<Project[]> {
+    const project = await prisma.project.findMany({
+      where: {
+        members: {
+          some: {
+            userId: userId,
+          },
+        },
+      },
+    });
+    return project;
   }
-
-  static async getByWorkspaceId(workspaceId: string): Promise<Project[]> {
-    // TODO: Implement with Prisma
-    throw new Error("Not implemented");
-  }
-
   static async update(id: string, input: UpdateProjectInput): Promise<Project> {
     // TODO: Implement with Prisma
     throw new Error("Not implemented");
