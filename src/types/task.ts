@@ -1,38 +1,37 @@
-export type TaskStatus = 'backlog' | 'todo' | 'in_progress' | 'in_review' | 'done';
-export type TaskPriority = 'low' | 'medium' | 'high' | 'urgent';
+import type { TaskStatus as PrismaTaskStatus } from "@prisma/client";
+
+export type TaskStatus = PrismaTaskStatus;
+export type TaskPriority = "low" | "medium" | "high" | "urgent";
 
 export interface Task {
   id: string;
   title: string;
-  description?: string;
+  description: string | null;
   status: TaskStatus;
-  priority: TaskPriority;
-  projectId: string;
-  assigneeId?: string;
-  createdById: string;
-  dueDate?: Date;
+  dueDate: Date | null;
   order: number;
+  projectId: string;
+  createdById: string;
+  assigneeId: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
 
 export interface CreateTaskInput {
   title: string;
-  description?: string;
+  description?: string | null;
   status?: TaskStatus;
-  priority?: TaskPriority;
+  dueDate?: Date | null;
   projectId: string;
-  assigneeId?: string;
+  assigneeId?: string | null;
   createdById: string;
-  dueDate?: Date;
 }
 
 export interface UpdateTaskInput {
   title?: string;
-  description?: string;
+  description?: string | null;
   status?: TaskStatus;
-  priority?: TaskPriority;
-  assigneeId?: string;
-  dueDate?: Date;
+  assigneeId?: string | null;
+  dueDate?: Date | null;
   order?: number;
 }

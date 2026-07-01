@@ -52,6 +52,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!loaded) return
     document.documentElement.style.setProperty('--accent', selectedAccent)
+    document.documentElement.style.setProperty('--primary', selectedAccent)
     window.localStorage.setItem(ACCENT_KEY, selectedAccent)
   }, [selectedAccent, loaded])
 

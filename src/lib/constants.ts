@@ -1,4 +1,4 @@
-export const APP_NAME = 'CollabPM';
+export const APP_NAME = 'Syncro';
 export const APP_DESCRIPTION = 'Collaborative Project Management System';
 
 export const TASK_STATUS_LABELS: Record<string, string> = {

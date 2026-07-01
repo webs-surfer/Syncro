@@ -20,4 +20,5 @@ export interface UpdateProjectInput {
   name?: string;
   description?: string;
   status?: ProjectStatus;
+  updatedAt?: Date;
 }

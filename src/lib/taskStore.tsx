@@ -48,7 +48,7 @@ interface TaskStore {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-const STORAGE_KEY = 'collabpm-task-store-v2'
+const STORAGE_KEY = 'syncro-task-store-v2'
 
 function mockTaskToStoreTask(t: TaskMock): StoreTask {
   return {

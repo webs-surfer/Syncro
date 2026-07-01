@@ -72,20 +72,12 @@ export default function SettingsPage() {
     }
 
     try {
+      // Note: Updating email requires verification in Clerk, which needs a
+      // different UI flow. For now, we only update name and username.
       const updatePayload: any = {
         firstName,
         lastName,
         username,
-      }
-
-      const primaryEmailId = getPrimaryEmailAddressId()
-      if (email && primaryEmailId) {
-        updatePayload.emailAddresses = [
-          {
-            id: primaryEmailId,
-            emailAddress: email,
-          },
-        ]
       }
 
       if (typeof (user as any).update === 'function') {
@@ -138,11 +130,11 @@ export default function SettingsPage() {
     if (!confirmed) return
 
     try {
-      if (typeof signOut === 'function') {
-        await signOut()
-        setAccountStatus('Signed out. Delete account requires backend support.')
+      if (typeof (user as any)?.delete === 'function') {
+        await (user as any).delete()
+        setAccountStatus('Account successfully deleted.')
       } else {
-        setAccountStatus('Unable to sign out. Delete account not available.')
+        setAccountStatus('Account deletion is not supported in this environment.')
       }
     } catch (error) {
       console.error(error)
@@ -241,7 +233,6 @@ export default function SettingsPage() {
               <Button
                 type="button"
                 className="text-sm font-medium rounded-lg"
-                style={{ background: '#2563eb', color: '#fff', border: 'none' }}
                 onClick={handleSaveProfile}
               >
                 Save changes
@@ -369,7 +360,6 @@ export default function SettingsPage() {
                 <Button
                   type="button"
                   className="mt-4 text-sm font-medium rounded-lg"
-                  style={{ background: '#2563eb', color: '#fff', border: 'none' }}
                   onClick={handleUpdatePassword}
                 >
                   Update password

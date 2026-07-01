@@ -50,7 +50,7 @@ const detailedFeatures = [
 const assignedIssues = [
   { title: 'Refactor auth middleware', status: 'In Progress', statusColor: '#00A3FF' },
   { title: 'Fix webhook retry logic', status: 'Blocked', statusColor: '#EF4444' },
-  { title: 'Add feature flag support', status: 'Open', statusColor: '#6B7280' },
+  { title: 'Add feature flag  support', status: 'Open', statusColor: '#6B7280' },
 ]
 
 const recentActivity = [
