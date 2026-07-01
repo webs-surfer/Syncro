@@ -1,5 +1,6 @@
 'use client'
 
+import { useAuth } from '@clerk/nextjs'
 import {
   createContext,
   useCallback,
@@ -8,12 +9,12 @@ import {
   useMemo,
   useState,
 } from 'react'
-import { mockTasks, mockProjects } from '@/lib/mockData'
-import type { TaskMock } from '@/lib/mockData'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export type TaskStatus = 'todo' | 'in_progress' | 'done'
+
+type ProjectStatus = 'active' | 'paused' | 'done'
 
 /** A flattened, UI-ready task object shared across all pages */
 export interface StoreTask {
@@ -37,63 +38,173 @@ export interface StoreTask {
   }[]
 }
 
+export interface StoreProject {
+  id: string
+  name: string
+  description: string
+  color: string
+  priority: 'high' | 'medium' | 'low'
+  status: ProjectStatus
+  lead: { initials: string; name: string; color: string; text: string }
+  members: { initials: string; color: string; text: string; name: string }[]
+}
+
 interface TaskStore {
   /** All tasks, as a flat array */
   tasks: StoreTask[]
+  /** All projects, as a flat array */
+  projects: StoreProject[]
+  /** Whether initial data is loading */
+  isLoading: boolean
+  /** Any request error */
+  error: string | null
   /** Add a new task */
-  addTask: (task: Omit<StoreTask, 'id' | 'createdAt'>) => void
+  addTask: (task: Omit<StoreTask, 'id' | 'createdAt'>) => Promise<void>
   /** Move a task to a new status */
-  updateTaskStatus: (taskId: string, status: TaskStatus) => void
+  updateTaskStatus: (taskId: string, status: TaskStatus) => Promise<void>
+  /** Refresh data from the backend */
+  refreshData: () => Promise<void>
+  /** Create a new project */
+  createProject: (input: { name: string; description: string }) => Promise<StoreProject | null>
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-const STORAGE_KEY = 'syncro-task-store-v2'
+function normalizeTaskStatus(status?: string): TaskStatus {
+  const value = (status ?? '').toUpperCase()
+  if (value === 'DONE') return 'done'
+  if (value === 'IN_PROGRESS' || value === 'INPROGRESS') return 'in_progress'
+  return 'todo'
+}
 
-function mockTaskToStoreTask(t: TaskMock): StoreTask {
+function normalizeProjectStatus(status?: string): ProjectStatus {
+  const value = (status ?? 'active').toLowerCase()
+  if (value === 'completed') return 'done'
+  if (value === 'archived') return 'paused'
+  return 'active'
+}
+
+function formatDateForUi(input?: string | null): string | undefined {
+  if (!input) return undefined
+  const date = new Date(input)
+  if (Number.isNaN(date.getTime())) return undefined
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
+function buildInitials(name: string) {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? '')
+    .join('') || 'PR'
+}
+
+function toColor(name: string) {
+  const palette = ['#6366f1', '#0f766e', '#f59e0b', '#ef4444', '#8b5cf6']
+  const hash = Array.from(name).reduce((acc, char) => acc + char.charCodeAt(0), 0)
+  return palette[hash % palette.length]
+}
+
+function mapProject(raw: any): StoreProject {
+  const name = typeof raw?.name === 'string' && raw.name.trim() ? raw.name : 'Untitled project'
+  const description = typeof raw?.description === 'string' ? raw.description : ''
+  const initials = buildInitials(name)
+  const color = typeof raw?.color === 'string' ? raw.color : toColor(name)
+
   return {
-    id: t.id,
-    title: t.title,
-    description: t.description,
-    status: t.status,
-    priority: t.priority,
-    dueDate: t.dueDate,
-    createdAt: t.createdAt,
-    projectId: t.project.id,
-    projectName: t.project.name,
-    tags: t.tags,
-    assignees: t.assignees.map((a) => ({
-      id: a.id,
-      name: a.name,
-      initials: a.initials,
-      color: a.color,
-      text: a.text,
-      isMe: a.isMe,
-    })),
+    id: raw?.id ?? '',
+    name,
+    description,
+    color,
+    priority: 'medium',
+    status: normalizeProjectStatus(raw?.status),
+    lead: {
+      initials,
+      name: 'Project owner',
+      color,
+      text: '#ffffff',
+    },
+    members:
+      Array.isArray(raw?.members) && raw.members.length > 0
+        ? raw.members.map((member: any) => ({
+            initials: buildInitials(member?.name ?? name),
+            color: toColor(member?.name ?? name),
+            text: '#ffffff',
+            name: member?.name ?? 'Team member',
+          }))
+        : [],
   }
 }
 
-/** Seed from mockData; overlay any persisted status/data from localStorage */
-function buildInitialTasks(): StoreTask[] {
-  const base: StoreTask[] = Object.values(mockTasks).map(mockTaskToStoreTask)
+function mapTask(raw: any, projectLookup: Record<string, StoreProject>): StoreTask {
+  const projectName =
+    typeof raw?.project?.name === 'string'
+      ? raw.project.name
+      : typeof raw?.projectName === 'string'
+        ? raw.projectName
+        : projectLookup[raw?.projectId ?? '']?.name ?? 'Unknown project'
 
-  if (typeof window === 'undefined') return base
+  const assignees = Array.isArray(raw?.assignees)
+    ? raw.assignees.map((assignee: any) => ({
+        id: assignee?.id ?? '',
+        name: assignee?.name ?? 'Unassigned',
+        initials: buildInitials(assignee?.name ?? 'Unassigned'),
+        color: assignee?.color ?? '#6366f1',
+        text: assignee?.text ?? '#ffffff',
+        isMe: Boolean(assignee?.isMe),
+      }))
+    : []
 
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY)
-    if (!raw) return base
-    const stored: StoreTask[] = JSON.parse(raw)
-
-    // Merge: keep stored tasks; re-insert any mock task not already in store
-    const storedIds = new Set(stored.map((t) => t.id))
-    const merged = [
-      ...stored,
-      ...base.filter((t) => !storedIds.has(t.id)),
-    ]
-    return merged
-  } catch {
-    return base
+  if (raw?.assigneeId && assignees.length === 0) {
+    assignees.push({
+      id: raw.assigneeId,
+      name: 'Assigned member',
+      initials: 'AM',
+      color: '#6366f1',
+      text: '#ffffff',
+    })
   }
+
+  return {
+    id: raw?.id ?? '',
+    title: raw?.title ?? 'Untitled task',
+    description: raw?.description ?? '',
+    status: normalizeTaskStatus(raw?.status),
+    priority: (raw?.priority ?? 'medium').toLowerCase(),
+    dueDate: formatDateForUi(raw?.dueDate),
+    createdAt: formatDateForUi(raw?.createdAt) ?? 'Recently created',
+    projectId: raw?.projectId ?? '',
+    projectName,
+    tags:
+      Array.isArray(raw?.tags) && raw.tags.length > 0
+        ? raw.tags
+        : [
+            {
+              label: normalizeTaskStatus(raw?.status) === 'done' ? 'Done' : normalizeTaskStatus(raw?.status) === 'in_progress' ? 'In Progress' : 'Todo',
+              color:
+                normalizeTaskStatus(raw?.status) === 'done'
+                  ? 'bg-emerald-500/15 text-emerald-300'
+                  : normalizeTaskStatus(raw?.status) === 'in_progress'
+                    ? 'bg-sky-500/15 text-sky-300'
+                    : 'bg-muted/20 text-muted-foreground',
+            },
+          ],
+    assignees,
+  }
+}
+
+function buildAuthHeaders(token: string | null) {
+  const headers: HeadersInit = {
+    Accept: 'application/json',
+    'Content-Type': 'application/json',
+  }
+
+  if (token) {
+    headers.Authorization = `Bearer ${token}`
+  }
+
+  return headers
 }
 
 // ── Context ───────────────────────────────────────────────────────────────────
@@ -101,40 +212,139 @@ function buildInitialTasks(): StoreTask[] {
 const TaskStoreContext = createContext<TaskStore | null>(null)
 
 export function TaskStoreProvider({ children }: { children: React.ReactNode }) {
-  const [tasks, setTasks] = useState<StoreTask[]>(buildInitialTasks)
+  const { getToken, isLoaded, isSignedIn } = useAuth()
+  const [tasks, setTasks] = useState<StoreTask[]>([])
+  const [projects, setProjects] = useState<StoreProject[]>([])
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  // Persist to localStorage on every change
-  useEffect(() => {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks))
-  }, [tasks])
-
-  const addTask = useCallback((task: Omit<StoreTask, 'id' | 'createdAt'>) => {
-    const now = new Date()
-    const formatted = now.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    })
-    const newTask: StoreTask = {
-      ...task,
-      id: `t${Date.now()}`,
-      createdAt: formatted,
+  const refreshData = useCallback(async () => {
+    if (!isLoaded || !isSignedIn) {
+      setTasks([])
+      setProjects([])
+      setError(null)
+      return
     }
-    setTasks((prev) => [newTask, ...prev])
-  }, [])
 
-  const updateTaskStatus = useCallback(
-    (taskId: string, status: TaskStatus) => {
-      setTasks((prev) =>
-        prev.map((t) => (t.id === taskId ? { ...t, status } : t)),
+    setIsLoading(true)
+    setError(null)
+
+    try {
+      const token = await getToken({ template: 'postman' })
+      const headers = buildAuthHeaders(token)
+
+      const [projectsResponse, tasksResponse] = await Promise.all([
+        fetch('/api/v1/projects', { headers, cache: 'no-store' }),
+        fetch('/api/v1/tasks', { headers, cache: 'no-store' }),
+      ])
+
+      const projectsData = await projectsResponse.json().catch(() => null)
+      const tasksData = await tasksResponse.json().catch(() => null)
+
+      if (!projectsResponse.ok || !tasksResponse.ok) {
+        throw new Error(projectsData?.error || tasksData?.error || 'Failed to load data')
+      }
+
+      const mappedProjects = Array.isArray(projectsData?.projects)
+        ? projectsData.projects.map(mapProject)
+        : []
+      const projectLookup = Object.fromEntries(mappedProjects.map((project: StoreProject) => [project.id, project]))
+
+      setProjects(mappedProjects)
+      setTasks(
+        Array.isArray(tasksData?.tasks)
+          ? tasksData.tasks.map((task: any) => mapTask(task, projectLookup))
+          : [],
       )
-    },
-    [],
-  )
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load data')
+      setTasks([])
+      setProjects([])
+    } finally {
+      setIsLoading(false)
+    }
+  }, [getToken, isLoaded, isSignedIn])
+
+  useEffect(() => {
+    void refreshData()
+  }, [refreshData])
+
+  const addTask = useCallback(async (task: Omit<StoreTask, 'id' | 'createdAt'>) => {
+    const token = await getToken({ template: 'postman' })
+    const headers = buildAuthHeaders(token)
+
+    const response = await fetch('/api/v1/tasks', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        title: task.title,
+        description: task.description,
+        projectId: task.projectId,
+        status: task.status.toUpperCase(),
+        dueDate: task.dueDate ? new Date(task.dueDate).toISOString() : undefined,
+      }),
+    })
+
+    const data = await response.json().catch(() => null)
+    if (!response.ok || !data?.success) {
+      throw new Error(data?.error || 'Failed to create task')
+    }
+
+    const mappedProjects = [...projects]
+    const projectLookup = Object.fromEntries(mappedProjects.map((project) => [project.id, project]))
+    setTasks((prev) => [mapTask(data.task, projectLookup), ...prev])
+  }, [getToken])
+
+  const updateTaskStatus = useCallback(async (taskId: string, status: TaskStatus) => {
+    const token = await getToken({ template: 'postman' })
+    const headers = buildAuthHeaders(token)
+
+    const response = await fetch(`/api/v1/tasks/${taskId}`, {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify({ status: status.toUpperCase() }),
+    })
+
+    const data = await response.json().catch(() => null)
+    if (!response.ok || !data?.success) {
+      throw new Error(data?.error || 'Failed to update task')
+    }
+
+    setTasks((prev) => prev.map((task) => (task.id === taskId ? { ...task, status } : task)))
+  }, [getToken])
+
+  const createProject = useCallback(async (input: { name: string; description: string }) => {
+    const token = await getToken({ template: 'postman' })
+    const headers = buildAuthHeaders(token)
+
+    const response = await fetch('/api/v1/projects', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(input),
+    })
+
+    const data = await response.json().catch(() => null)
+    if (!response.ok || !data?.success) {
+      throw new Error(data?.error || 'Failed to create project')
+    }
+
+    const createdProject = mapProject(data.project)
+    setProjects((prev) => [createdProject, ...prev])
+    return createdProject
+  }, [getToken])
 
   const value = useMemo(
-    () => ({ tasks, addTask, updateTaskStatus }),
-    [tasks, addTask, updateTaskStatus],
+    () => ({
+      tasks,
+      projects,
+      isLoading,
+      error,
+      addTask,
+      updateTaskStatus,
+      refreshData,
+      createProject,
+    }),
+    [tasks, projects, isLoading, error, addTask, updateTaskStatus, refreshData, createProject],
   )
 
   return (
@@ -159,15 +369,16 @@ export function useProjectTasks(projectId: string) {
   )
 }
 
-/** Returns all projects from mockData (can be extended later) */
+/** Returns all projects available for task selection */
 export function useProjectOptions() {
+  const { projects } = useTaskStore()
   return useMemo(
     () =>
-      Object.values(mockProjects).map((p) => ({
-        id: p.id,
-        name: p.name,
-        color: p.color,
+      projects.map((project) => ({
+        id: project.id,
+        name: project.name,
+        color: project.color,
       })),
-    [],
+    [projects],
   )
 }

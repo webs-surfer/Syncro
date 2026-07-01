@@ -1,9 +1,38 @@
 'use client'
 
-import { FormEvent, useMemo, useState } from 'react'
+import { FormEvent, useEffect, useMemo, useState } from 'react'
+import { useAuth } from '@clerk/nextjs'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
-import { useTaskStore, useProjectOptions, type TaskStatus, type StoreTask } from '@/lib/taskStore'
+import type { TaskStatus } from '@/lib/taskStore'
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+type TaskListItem = {
+  id: string
+  title: string
+  description: string
+  status: TaskStatus
+  priority: 'high' | 'medium' | 'low'
+  dueDate?: string
+  projectId: string
+  projectName: string
+  tags: { label: string; color: string }[]
+  assignees: {
+    id: string
+    name: string
+    initials: string
+    color: string
+    text: string
+    isMe?: boolean
+  }[]
+}
+
+type ProjectOption = {
+  id: string
+  name: string
+  color: string
+}
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -19,24 +48,140 @@ const colAccent: Record<TaskStatus, string> = {
   done: 'bg-green-500/15 text-green-300',
 }
 
+// ── Helpers ─────────────────────────────────────────────────────────────────
+
+function normalizeTaskStatus(status?: string): TaskStatus {
+  const value = (status ?? '').toUpperCase()
+  if (value === 'DONE') return 'done'
+  if (value === 'IN_PROGRESS' || value === 'INPROGRESS') return 'in_progress'
+  return 'todo'
+}
+
+function mapApiTask(task: any, projectNameByIdOrFallback?: Map<string, string> | string, fallbackProjectName = 'Unknown project'): TaskListItem {
+  const projectId = task?.projectId ?? task?.project?.id ?? ''
+  const resolvedProjectName =
+    typeof projectNameByIdOrFallback === 'string'
+      ? projectNameByIdOrFallback
+      : projectNameByIdOrFallback?.get(projectId) ?? task?.project?.name ?? fallbackProjectName
+
+  return {
+    id: task?.id ?? '',
+    title: task?.title ?? 'Untitled task',
+    description: task?.description ?? '',
+    status: normalizeTaskStatus(task?.status),
+    priority: (task?.priority ?? 'medium').toLowerCase(),
+    dueDate: task?.dueDate ? new Date(task.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : undefined,
+    projectId,
+    projectName: resolvedProjectName,
+    tags:
+      Array.isArray(task?.tags) && task.tags.length > 0
+        ? task.tags
+        : [
+            {
+              label: normalizeTaskStatus(task?.status) === 'done' ? 'Done' : normalizeTaskStatus(task?.status) === 'in_progress' ? 'In Progress' : 'Todo',
+              color:
+                normalizeTaskStatus(task?.status) === 'done'
+                  ? 'bg-emerald-500/15 text-emerald-300'
+                  : normalizeTaskStatus(task?.status) === 'in_progress'
+                    ? 'bg-sky-500/15 text-sky-300'
+                    : 'bg-muted/20 text-muted-foreground',
+            },
+          ],
+    assignees: Array.isArray(task?.assignees)
+      ? task.assignees.map((assignee: any) => ({
+          id: assignee?.id ?? '',
+          name: assignee?.name ?? 'Unassigned',
+          initials: (assignee?.name ?? 'Unassigned').split(/\s+/).filter(Boolean).slice(0, 2).map((part: string) => part[0]?.toUpperCase() ?? '').join('') || 'U',
+          color: assignee?.color ?? '#6366f1',
+          text: assignee?.text ?? '#ffffff',
+          isMe: Boolean(assignee?.isMe),
+        }))
+      : [],
+  }
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function TasksPage() {
-  const { tasks, addTask, updateTaskStatus } = useTaskStore()
-  const projectOptions = useProjectOptions()
+  const { getToken, isLoaded, isSignedIn } = useAuth()
+  const [tasks, setTasks] = useState<TaskListItem[]>([])
+  const [projectOptions, setProjectOptions] = useState<ProjectOption[]>([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  const [dragging, setDragging] = useState<{ task: StoreTask; from: TaskStatus } | null>(null)
+  const [dragging, setDragging] = useState<{ task: TaskListItem; from: TaskStatus } | null>(null)
   const [dragOver, setDragOver] = useState<TaskStatus | null>(null)
 
   // Create form state
   const [showCreate, setShowCreate] = useState(false)
   const [title, setTitle] = useState('')
-  const [projectId, setProjectId] = useState(projectOptions[0]?.id || '')
+  const [projectId, setProjectId] = useState('')
   const [dueDate, setDueDate] = useState('')
   const [status, setStatus] = useState<TaskStatus>('todo')
 
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn) return
+
+    let cancelled = false
+
+    async function loadData() {
+      setLoading(true)
+      setError(null)
+
+      try {
+        const token = await getToken({ template: 'postman' })
+        const headers = {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        }
+
+        const [projectsResponse, tasksResponse] = await Promise.all([
+          fetch('/api/v1/projects', { headers, cache: 'no-store' }),
+          fetch('/api/v1/tasks', { headers, cache: 'no-store' }),
+        ])
+
+        const projectsData = await projectsResponse.json().catch(() => null)
+        const tasksData = await tasksResponse.json().catch(() => null)
+
+        if (!projectsResponse.ok || !tasksResponse.ok) {
+          throw new Error(projectsData?.error || tasksData?.error || 'Unable to load tasks')
+        }
+
+        if (!cancelled) {
+          const nextProjects = Array.isArray(projectsData?.projects)
+            ? projectsData.projects.map((project: any) => ({
+                id: project?.id ?? '',
+                name: project?.name ?? 'Untitled project',
+                color: project?.color ?? '#6366f1',
+              }))
+            : []
+          const projectNameById = new Map<string, string>(nextProjects.map((project: { id: string; name: string }) => [project.id, project.name]))
+
+          setProjectOptions(nextProjects)
+          setProjectId((current) => current || nextProjects[0]?.id || '')
+          setTasks(Array.isArray(tasksData?.tasks) ? tasksData.tasks.map((task: any) => mapApiTask(task, projectNameById)) : [])
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : 'Unable to load tasks')
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false)
+        }
+      }
+    }
+
+    void loadData()
+
+    return () => {
+      cancelled = true
+    }
+  }, [getToken, isLoaded, isSignedIn])
+
   // Group tasks by status
-  const tasksByStatus = useMemo<Record<TaskStatus, StoreTask[]>>(
+  const tasksByStatus = useMemo<Record<TaskStatus, TaskListItem[]>>(
     () => ({
       todo: tasks.filter((t) => t.status === 'todo'),
       in_progress: tasks.filter((t) => t.status === 'in_progress'),
@@ -47,62 +192,83 @@ export default function TasksPage() {
 
   // ── Drag handlers ────────────────────────────────────────────────────────────
 
-  function onDragStart(task: StoreTask, from: TaskStatus) {
+  function onDragStart(task: TaskListItem, from: TaskStatus) {
     setDragging({ task, from })
   }
 
-  function onDrop(to: TaskStatus) {
+  async function onDrop(to: TaskStatus) {
     if (!dragging || dragging.from === to) {
       setDragging(null)
       setDragOver(null)
       return
     }
-    updateTaskStatus(dragging.task.id, to)
-    setDragging(null)
-    setDragOver(null)
+
+    try {
+      const token = await getToken({ template: 'postman' })
+      const response = await fetch(`/api/v1/tasks/${dragging.task.id}`, {
+        method: 'PATCH',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ status: to.toUpperCase() }),
+      })
+
+      const data = await response.json().catch(() => null)
+      if (!response.ok || !data?.success) {
+        throw new Error(data?.error || 'Unable to update task')
+      }
+
+      setTasks((current) => current.map((task) => (task.id === dragging.task.id ? { ...task, status: to } : task)))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to update task')
+    } finally {
+      setDragging(null)
+      setDragOver(null)
+    }
   }
 
   // ── Create task ──────────────────────────────────────────────────────────────
 
-  function handleCreateTask(event: FormEvent<HTMLFormElement>) {
+  async function handleCreateTask(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!title.trim() || !projectId) return
 
-    const project = projectOptions.find((p) => p.id === projectId)
-
-    addTask({
-      title: title.trim(),
-      description: '',
-      status,
-      priority: 'medium',
-      dueDate: dueDate || undefined,
-      projectId,
-      projectName: project?.name ?? 'Unknown project',
-      tags: [
-        {
-          label:
-            status === 'done'
-              ? 'Done'
-              : status === 'in_progress'
-              ? 'In Progress'
-              : 'Todo',
-          color:
-            status === 'done'
-              ? 'bg-emerald-500/15 text-emerald-300'
-              : status === 'in_progress'
-              ? 'bg-sky-500/15 text-sky-300'
-              : 'bg-muted/20 text-muted-foreground',
+    try {
+      const token = await getToken({ template: 'postman' })
+      const response = await fetch('/api/v1/tasks', {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-      ],
-      assignees: [],
-    })
+        body: JSON.stringify({
+          title: title.trim(),
+          description: '',
+          projectId,
+          status: status.toUpperCase(),
+          dueDate: dueDate || undefined,
+        }),
+      })
 
-    // Reset form
-    setTitle('')
-    setDueDate('')
-    setStatus('todo')
-    setProjectId(projectOptions[0]?.id || '')
-    setShowCreate(false)
+      const data = await response.json().catch(() => null)
+      if (!response.ok || !data?.success) {
+        throw new Error(data?.error || 'Unable to create task')
+      }
+
+      const project = projectOptions.find((item) => item.id === projectId)
+      setTasks((current) => [mapApiTask(data.task, project?.name ?? 'Unknown project'), ...current])
+
+      setTitle('')
+      setDueDate('')
+      setStatus('todo')
+      setProjectId(projectOptions[0]?.id || '')
+      setShowCreate(false)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to create task')
+    }
   }
 
   // ── Render ───────────────────────────────────────────────────────────────────
@@ -193,6 +359,10 @@ export default function TasksPage() {
         Drag tasks between columns to update status — changes sync to the project board automatically.
       </p>
 
+      {error && (
+        <p className="mb-4 text-sm text-red-500">{error}</p>
+      )}
+
       {/* Kanban */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {columns.map(({ key, label }) => (
@@ -222,6 +392,9 @@ export default function TasksPage() {
 
             {/* Task cards */}
             <div className="flex flex-col gap-2 min-h-20">
+              {loading && tasks.length === 0 && (
+                <p className="text-xs text-muted-foreground">Loading tasks…</p>
+              )}
               {tasksByStatus[key].map((task) => (
                 <Link
                   key={task.id}

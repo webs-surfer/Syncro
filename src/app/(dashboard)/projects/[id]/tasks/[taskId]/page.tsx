@@ -1,12 +1,13 @@
 'use client'
 
-import { useState, use } from 'react'
+import { useState, use, useEffect } from 'react'
+import { useAuth } from '@clerk/nextjs'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { useTaskStore, type TaskStatus } from '@/lib/taskStore'
+import type { TaskStatus } from '@/lib/taskStore'
 
 // ── Moved outside component ───────────────────────────────────────────────────
 
@@ -24,6 +25,27 @@ const statusLabels: Record<TaskStatus, string> = {
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
+type ProjectTaskDetailItem = {
+  id: string
+  title: string
+  description: string
+  status: TaskStatus
+  priority: 'high' | 'medium' | 'low'
+  dueDate?: string
+  createdAt: string
+  projectId: string
+  projectName: string
+  tags: { label: string; color: string }[]
+  assignees: {
+    id: string
+    name: string
+    initials: string
+    color: string
+    text: string
+    isMe?: boolean
+  }[]
+}
+
 export default function ProjectTaskDetailPage({
   params,
 }: {
@@ -31,11 +53,87 @@ export default function ProjectTaskDetailPage({
 }) {
   const router = useRouter()
   const resolvedParams = use(params)
-  const { tasks, updateTaskStatus } = useTaskStore()
-
-  const task = tasks.find((t) => t.id === resolvedParams.taskId)
-
+  const { getToken, isLoaded, isSignedIn } = useAuth()
+  const [task, setTask] = useState<ProjectTaskDetailItem | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [showStatusMenu, setShowStatusMenu] = useState(false)
+
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn) return
+
+    let cancelled = false
+
+    async function loadTask() {
+      setLoading(true)
+      setError(null)
+
+      try {
+        const token = await getToken({ template: 'postman' })
+        const response = await fetch(`/api/v1/tasks/${resolvedParams.taskId}`, {
+          headers: {
+            Accept: 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          cache: 'no-store',
+        })
+
+        const data = await response.json().catch(() => null)
+        if (!response.ok || !data?.success) {
+          throw new Error(data?.error || 'Task not found')
+        }
+
+        if (!cancelled) {
+          const apiTask = data.task
+          setTask({
+            id: apiTask?.id ?? resolvedParams.taskId,
+            title: apiTask?.title ?? 'Untitled task',
+            description: apiTask?.description ?? '',
+            status: (apiTask?.status ?? 'TODO').toUpperCase() === 'DONE' ? 'done' : (apiTask?.status ?? 'TODO').toUpperCase() === 'IN_PROGRESS' ? 'in_progress' : 'todo',
+            priority: (apiTask?.priority ?? 'medium').toLowerCase(),
+            dueDate: apiTask?.dueDate ? new Date(apiTask.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : undefined,
+            createdAt: apiTask?.createdAt ? new Date(apiTask.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Recently created',
+            projectId: apiTask?.projectId ?? '',
+            projectName: apiTask?.project?.name ?? 'Unknown project',
+            tags: Array.isArray(apiTask?.tags) && apiTask.tags.length > 0 ? apiTask.tags : [],
+            assignees: Array.isArray(apiTask?.assignees)
+              ? apiTask.assignees.map((assignee: any) => ({
+                  id: assignee?.id ?? '',
+                  name: assignee?.name ?? 'Unassigned',
+                  initials: (assignee?.name ?? 'Unassigned').split(/\s+/).filter(Boolean).slice(0, 2).map((part: string) => part[0]?.toUpperCase() ?? '').join('') || 'U',
+                  color: assignee?.color ?? '#6366f1',
+                  text: assignee?.text ?? '#ffffff',
+                  isMe: Boolean(assignee?.isMe),
+                }))
+              : [],
+          })
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : 'Task not found')
+          setTask(null)
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false)
+        }
+      }
+    }
+
+    void loadTask()
+
+    return () => {
+      cancelled = true
+    }
+  }, [getToken, isLoaded, isSignedIn, resolvedParams.taskId])
+
+  if (loading) {
+    return (
+      <main className="flex-1 p-8">
+        <p className="text-sm text-muted-foreground">Loading task…</p>
+      </main>
+    )
+  }
 
   if (!task) {
     return (
@@ -46,18 +144,36 @@ export default function ProjectTaskDetailPage({
         >
           ← Back
         </button>
-        <p className="text-sm text-muted-foreground">Task not found.</p>
+        <p className="text-sm text-muted-foreground">{error || 'Task not found.'}</p>
       </main>
     )
   }
 
-  // Determine if the current user is an assignee (can change status)
-  const isAssigned = task.assignees.some((a) => a.isMe === true)
+  async function handleStatusChange(s: TaskStatus) {
+    if (!task) return
 
-  function handleStatusChange(s: TaskStatus) {
-    if (!isAssigned) return
-    updateTaskStatus(task!.id, s)
-    setShowStatusMenu(false)
+    try {
+      const token = await getToken({ template: 'postman' })
+      const response = await fetch(`/api/v1/tasks/${task.id}`, {
+        method: 'PATCH',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ status: s.toUpperCase() }),
+      })
+
+      const data = await response.json().catch(() => null)
+      if (!response.ok || !data?.success) {
+        throw new Error(data?.error || 'Unable to update task')
+      }
+
+      setTask((current) => (current ? { ...current, status: s } : current))
+      setShowStatusMenu(false)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to update task')
+    }
   }
 
   return (
@@ -170,23 +286,13 @@ export default function ProjectTaskDetailPage({
               </CardTitle>
             </CardHeader>
             <CardContent className="relative">
-              {/* Permission notice */}
-              {!isAssigned && (
-                <p className="text-[10px] text-amber-300 bg-amber-500/15 px-2 py-1 rounded-lg mb-2">
-                  Only assignees can change status
-                </p>
-              )}
               <button
-                onClick={() => isAssigned && setShowStatusMenu(!showStatusMenu)}
-                disabled={!isAssigned}
-                title={isAssigned ? 'Change status' : 'Only assignees can change status'}
-                className={`w-full text-left text-xs font-semibold px-3 py-1.5 rounded-full transition-colors ${statusStyles[task.status]} ${
-                  !isAssigned ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'
-                }`}
+                onClick={() => setShowStatusMenu(!showStatusMenu)}
+                className={`w-full text-left text-xs font-semibold px-3 py-1.5 rounded-full transition-colors ${statusStyles[task.status]} cursor-pointer`}
               >
-                {statusLabels[task.status]} {isAssigned ? '▾' : '🔒'}
+                {statusLabels[task.status]} ▾
               </button>
-              {showStatusMenu && isAssigned && (
+              {showStatusMenu && (
                 <div
                   className="absolute top-10 left-0 right-0 mx-4 bg-card rounded-lg shadow-md z-10 overflow-hidden border border-border"
                 >

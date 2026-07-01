@@ -10,32 +10,18 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { mockProjects, mockTasks } from "@/lib/mockData";
 
-// Calculate dynamic stats
-const totalProjectsCount = Object.keys(mockProjects).length;
-const openTasksCount = Object.values(mockTasks).filter(t => t.status !== 'done').length;
+async function fetchApi<T>(path: string, token: string | null): Promise<T | null> {
+  const headers: HeadersInit = { Accept: "application/json" };
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
 
-const stats = [
-  {
-    label: "Total Projects",
-    value: String(totalProjectsCount),
-    description: totalProjectsCount === 1 ? "1 project active" : `${totalProjectsCount} projects active`,
-    href: "/projects",
-    cta: "View projects →",
-    accent: "text-blue-600",
-    border: "border-blue-100",
-  },
-  {
-    label: "Open Tasks",
-    value: String(openTasksCount),
-    description: openTasksCount === 1 ? "1 task open" : `${openTasksCount} tasks open`,
-    href: "/tasks",
-    cta: "View tasks →",
-    accent: "text-sky-600",
-    border: "border-sky-100",
-  },
-];
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  const response = await fetch(`${baseUrl}${path}`, { headers, cache: "no-store" });
+  if (!response.ok) return null;
+  return response.json() as Promise<T>;
+}
 
 const quickActions = [
   {
@@ -49,30 +35,6 @@ const quickActions = [
     href: "/tasks",
   },
 ];
-
-const recentProjects = Object.values(mockProjects).slice(0, 3);
-const recentTasks = Object.values(mockTasks)
-  .filter((t) => t.status !== 'done')
-  .slice(0, 3);
-
-// Derive deadlines dynamically from mock tasks
-const deadlines = Object.values(mockTasks)
-  .filter((t) => t.dueDate && t.status !== 'done')
-  .map((t) => {
-    // parse due date: since dueDate in mockTasks is like 'Jun 12', let's parse it relative to current year
-    const year = new Date().getFullYear();
-    const dateStr = `${t.dueDate}, ${year}`;
-    const parsedDate = new Date(Date.parse(dateStr));
-    return {
-      id: t.id,
-      title: t.title,
-      project: t.project.name,
-      projectId: t.project.id,
-      dueDate: parsedDate,
-      projectHref: `/projects/${t.project.id}`,
-      taskHref: `/projects/${t.project.id}/tasks/${t.id}`,
-    };
-  });
 
 function formatDueDate(date: Date): { label: string; urgent: boolean } {
   const now = new Date();
@@ -90,11 +52,75 @@ function formatDueDate(date: Date): { label: string; urgent: boolean } {
 }
 
 export default async function DashboardPage() {
-  const { userId } = await auth();
+  const { userId, getToken } = await auth();
   if (!userId) redirect("/login");
 
   const user = await currentUser();
   const firstName = user?.firstName ?? "there";
+  const token = await getToken({ template: "postman" });
+
+  const [projectsResponse, tasksResponse] = await Promise.all([
+    fetchApi<{ success: boolean; projects?: Array<any> }>('/api/v1/projects', token),
+    fetchApi<{ success: boolean; tasks?: Array<any> }>('/api/v1/tasks', token),
+  ]);
+
+  const projects = Array.isArray(projectsResponse?.projects) ? projectsResponse.projects : [];
+  const tasks = Array.isArray(tasksResponse?.tasks) ? tasksResponse.tasks : [];
+  const projectNameById = new Map<string, string>(
+    projects.map((project: any) => [project?.id ?? '', project?.name ?? 'Untitled project']),
+  );
+  const resolveProjectName = (task: any) =>
+    projectNameById.get(task?.projectId ?? task?.project?.id ?? '') ??
+    task?.project?.name ??
+    task?.projectName ??
+    'Unknown project';
+
+  const totalProjectsCount = projects.length;
+  const openTasksCount = tasks.filter((task) => task?.status !== 'DONE' && task?.status !== 'done').length;
+  const recentProjects = projects.slice(0, 3);
+  const recentTasks = tasks
+    .filter((task) => task?.status !== 'DONE' && task?.status !== 'done')
+    .slice(0, 3)
+    .map((task) => ({
+      ...task,
+      resolvedProjectName: resolveProjectName(task),
+    }));
+  const deadlines = tasks
+    .filter((task) => task?.dueDate && task?.status !== 'DONE' && task?.status !== 'done')
+    .map((task) => {
+      const parsedDate = new Date(task.dueDate);
+      return {
+        id: task.id,
+        title: task.title,
+        project: resolveProjectName(task),
+        projectId: task.projectId,
+        dueDate: parsedDate,
+        projectHref: `/projects/${task.projectId}`,
+        taskHref: `/tasks/${task.id}`,
+      };
+    })
+    .filter((item) => !Number.isNaN(item.dueDate.getTime()));
+
+  const stats = [
+    {
+      label: "Total Projects",
+      value: String(totalProjectsCount),
+      description: totalProjectsCount === 1 ? "1 project active" : `${totalProjectsCount} projects active`,
+      href: "/projects",
+      cta: "View projects →",
+      accent: "text-blue-600",
+      border: "border-blue-100",
+    },
+    {
+      label: "Open Tasks",
+      value: String(openTasksCount),
+      description: openTasksCount === 1 ? "1 task open" : `${openTasksCount} tasks open`,
+      href: "/tasks",
+      cta: "View tasks →",
+      accent: "text-sky-600",
+      border: "border-sky-100",
+    },
+  ];
 
   const hour = new Date().getHours();
   const greeting =
@@ -154,7 +180,7 @@ export default async function DashboardPage() {
                             {project.name}
                           </p>
                           <p className="text-[10px] text-muted-foreground truncate">
-                            {project.status} · {project.members.length} members
+                            {project.status ?? "active"} · {project.members?.length ?? 0} members
                           </p>
                         </Link>
                       ))}
@@ -173,7 +199,7 @@ export default async function DashboardPage() {
                             {task.title}
                           </p>
                           <p className="text-[10px] text-muted-foreground truncate">
-                            {task.project.name}
+                            {task.resolvedProjectName}
                           </p>
                         </Link>
                       ))}

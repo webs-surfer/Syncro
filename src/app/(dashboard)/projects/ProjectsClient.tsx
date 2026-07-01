@@ -1,26 +1,13 @@
 'use client'
 
-import { FormEvent, useEffect, useState } from 'react'
+import { FormEvent, useState } from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
-import { mockProjects, mockUsers } from '@/lib/mockData'
+import { useTaskStore } from '@/lib/taskStore'
 
 type Priority = 'high' | 'medium' | 'low'
+
 type Status = 'active' | 'done' | 'paused'
-
-interface Project {
-  id: string
-  name: string
-  description: string
-  color: string
-  priority: Priority
-  status: Status
-  lead: { initials: string; name: string; color: string; text: string }
-  members: { initials: string; color: string; text: string }[]
-}
-
-const initialProjects = Object.values(mockProjects)
-const STORAGE_KEY = 'collabpm-projects'
 
 const priorityStyles: Record<Priority, string> = {
   high: 'bg-red-500/15 text-red-300',
@@ -29,53 +16,22 @@ const priorityStyles: Record<Priority, string> = {
 }
 
 export default function ProjectsClient() {
-  const [projects, setProjects] = useState<Project[]>(() => {
-    if (typeof window === 'undefined') return initialProjects
-    const stored = window.localStorage.getItem(STORAGE_KEY)
-    if (!stored) return initialProjects
-
-    try {
-      const parsed = JSON.parse(stored) as Project[]
-      return Array.isArray(parsed) && parsed.length > 0 ? parsed : initialProjects
-    } catch (error) {
-      console.warn('Failed to parse stored projects', error)
-      return initialProjects
-    }
-  })
+  const { projects, isLoading, createProject } = useTaskStore()
   const [showCreate, setShowCreate] = useState(false)
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [priority, setPriority] = useState<Priority>('medium')
   const [status, setStatus] = useState<Status>('active')
 
-  const lead = mockUsers.u1
-  const members = [mockUsers.u1, mockUsers.u2]
-
-  useEffect(() => {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(projects))
-  }, [projects])
-
-  function handleCreateProject(event: FormEvent<HTMLFormElement>) {
+  async function handleCreateProject(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!name.trim()) return
 
-    const nextProject: Project = {
-      id: `proj-${Date.now()}`,
+    await createProject({
       name: name.trim(),
       description: description.trim() || 'No description provided yet.',
-      color: '#6366f1',
-      priority,
-      status,
-      lead: {
-        initials: lead.initials,
-        name: lead.name,
-        color: lead.color,
-        text: lead.text,
-      },
-      members: members.map((m) => ({ initials: m.initials, color: m.color, text: m.text })),
-    }
+    })
 
-    setProjects((previous) => [nextProject, ...previous])
     setName('')
     setDescription('')
     setPriority('medium')
@@ -154,7 +110,7 @@ export default function ProjectsClient() {
       )}
 
       <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-4">
-        {projectCount > 0 ? `All projects · ${projectCount}` : 'No projects yet'}
+        {isLoading ? 'Loading projects…' : projectCount > 0 ? `All projects · ${projectCount}` : 'No projects yet'}
       </p>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
