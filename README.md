@@ -269,7 +269,6 @@ Collaboration
 Member role management
 Activity logs
 Tasks
-Labels
 Priority
 Comments
 Attachments
