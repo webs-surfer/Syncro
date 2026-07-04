@@ -96,15 +96,17 @@ export default function ProjectTaskDetailPage({
             projectId: apiTask?.projectId ?? '',
             projectName: apiTask?.project?.name ?? 'Unknown project',
             tags: Array.isArray(apiTask?.tags) && apiTask.tags.length > 0 ? apiTask.tags : [],
-            assignees: Array.isArray(apiTask?.assignees)
-              ? apiTask.assignees.map((assignee: any) => ({
-                  id: assignee?.id ?? '',
-                  name: assignee?.name ?? 'Unassigned',
-                  initials: (assignee?.name ?? 'Unassigned').split(/\s+/).filter(Boolean).slice(0, 2).map((part: string) => part[0]?.toUpperCase() ?? '').join('') || 'U',
-                  color: assignee?.color ?? '#6366f1',
-                  text: assignee?.text ?? '#ffffff',
-                  isMe: Boolean(assignee?.isMe),
-                }))
+            assignees: apiTask?.assignee
+              ? [
+                  {
+                    id: apiTask.assignee?.id ?? '',
+                    name: apiTask.assignee?.name ?? 'Unassigned',
+                    initials: (apiTask.assignee?.name ?? 'Unassigned').split(/\s+/).filter(Boolean).slice(0, 2).map((part: string) => part[0]?.toUpperCase() ?? '').join('') || 'U',
+                    color: '#6366f1',
+                    text: '#ffffff',
+                    isMe: Boolean(apiTask.assignee?.isMe),
+                  },
+                ]
               : [],
           })
         }

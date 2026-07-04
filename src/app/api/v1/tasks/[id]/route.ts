@@ -26,8 +26,8 @@ export async function GET(
 
     const { id } = await params;
 
-    // ── 2. Fetch task ─────────────────────────────────────────────────────────
-    const task = await TaskService.getById(id);
+    // ── 2. Fetch task with relations ──────────────────────────────────────────
+    const task = await TaskService.getByIdWithRelations(id);
     if (!task) {
       return NextResponse.json({ error: 'Task not found' }, { status: 404 });
     }
@@ -108,8 +108,10 @@ export async function PATCH(
 
     const isAdmin = await ProjectService.isUserAdmin(existing.projectId, user.id);
     const isOwner = await ProjectService.isUserOwner(existing.projectId, user.id);
+    const isCreator = existing.createdById === user.id;
+    const isAssignee = existing.assigneeId === user.id;
 
-    if (!isAdmin && !isOwner) {
+    if (!isCreator && !isAssignee && !isAdmin && !isOwner) {
       return NextResponse.json(
         {
           error:
@@ -139,7 +141,10 @@ export async function PATCH(
       ...(order !== undefined && { order: Number(order) }),
     });
 
-    return NextResponse.json({ success: true, task: updatedTask });
+    // Fetch the updated task with related data for the response
+    const fullTask = await TaskService.getByIdWithRelations(updatedTask.id);
+
+    return NextResponse.json({ success: true, task: fullTask });
   } catch (error) {
     console.error('TASK UPDATE ERROR:', error);
     return NextResponse.json(
@@ -192,12 +197,12 @@ export async function DELETE(
 
     const isOwner = await ProjectService.isUserOwner(existing.projectId, user.id);
     const isAdmin = await ProjectService.isUserAdmin(existing.projectId, user.id);
+    const isCreator = existing.createdById === user.id;
 
-    if (!isAdmin && isOwner) {
+    if (!isCreator && !isAdmin && !isOwner) {
       return NextResponse.json(
         {
-          error:
-            'Forbidden — only project admin/owner can delete this task',
+          error: 'Forbidden — only the task creator or a project admin/owner can delete this task',
         },
         { status: 403 },
       );

@@ -44,10 +44,10 @@ export async function GET(request: Request) {
         );
       }
 
-      tasks = await TaskService.getByProjectId(projectId);
+      tasks = await TaskService.getByProjectIdWithRelations(projectId);
     } else {
-      // No filter — return all tasks for this user across all projects.
-      tasks = await TaskService.getAllTasksByUserId(user.id);
+      // No filter — return only tasks assigned to this user across all projects.
+      tasks = await TaskService.getTasksAssignedToUserWithRelations(user.id);
     }
 
     return NextResponse.json({ success: true, tasks });
@@ -181,7 +181,10 @@ export async function POST(request: Request) {
       dueDate: parsedDueDate || undefined,
     });
 
-    return NextResponse.json({ success: true, task }, { status: 201 });
+    // Fetch the created task with related data for the response
+    const fullTask = await TaskService.getByIdWithRelations(task.id);
+
+    return NextResponse.json({ success: true, task: fullTask }, { status: 201 });
   } catch (error) {
     console.error("TASK CREATE ERROR:", error);
     return NextResponse.json(

@@ -17,8 +17,9 @@ type ProjectDetailItem = {
   color: string
   priority: Priority
   status: 'active' | 'done' | 'paused'
+  inviteCode?: string
   lead: { initials: string; name: string; color: string; text: string }
-  members: { initials: string; color: string; text: string; name: string }[]
+  members: { initials: string; color: string; text: string; name: string; role?: string }[]
 }
 
 type ProjectTaskItem = {
@@ -228,6 +229,7 @@ export default function ProjectDetailPage({
     color: '#6366f1',
     priority: 'medium',
     status: 'active',
+    inviteCode: '',
     lead: {
       initials: 'PR',
       name: 'Project owner',
@@ -244,6 +246,10 @@ export default function ProjectDetailPage({
     null,
   )
   const [dragOver, setDragOver] = useState<TaskStatus | null>(null)
+  const [inviteMessage, setInviteMessage] = useState<string | null>(null)
+  const [joinCode, setJoinCode] = useState('')
+  const [joinMessage, setJoinMessage] = useState<string | null>(null)
+  const [joining, setJoining] = useState(false)
 
   // Create-task modal state
   const [showCreate, setShowCreate] = useState(false)
@@ -280,6 +286,35 @@ export default function ProjectDetailPage({
 
           if (matchedProject) {
             const normalizedStatus = String(matchedProject.status ?? 'ACTIVE').toLowerCase()
+
+            // helper to build initials and a deterministic color from a name
+            const buildInitials = (name = '') =>
+              name
+                .split(/\s+/)
+                .filter(Boolean)
+                .slice(0, 2)
+                .map((part) => part[0]?.toUpperCase() ?? '')
+                .join('') || 'PR'
+
+            const toColor = (name = '') => {
+              const palette = ['#6366f1', '#0f766e', '#f59e0b', '#ef4444', '#8b5cf6']
+              const hash = Array.from(name).reduce((acc, char) => acc + char.charCodeAt(0), 0)
+              return palette[hash % palette.length]
+            }
+
+            const members = Array.isArray(matchedProject.members)
+              ? matchedProject.members.map((m: any) => ({
+                  name: m?.name ?? 'Team member',
+                  initials: buildInitials(m?.name ?? 'Team member'),
+                  color: toColor(m?.name ?? 'Team member'),
+                  text: '#ffffff',
+                  role: m?.role ?? 'MEMBER',
+                }))
+              : []
+
+            const owner = matchedProject.members?.find((m: any) => m?.role === 'OWNER')
+            const leadName = owner?.name ?? matchedProject.name ?? 'Project owner'
+
             setProject({
               id: matchedProject.id,
               name: matchedProject.name ?? 'Untitled project',
@@ -287,13 +322,14 @@ export default function ProjectDetailPage({
               color: '#6366f1',
               priority: 'medium',
               status: normalizedStatus === 'completed' || normalizedStatus === 'done' ? 'done' : normalizedStatus === 'archived' || normalizedStatus === 'paused' ? 'paused' : 'active',
+              inviteCode: matchedProject.inviteCode ?? '',
               lead: {
-                initials: 'PR',
-                name: 'Project owner',
-                color: '#6366f1',
+                initials: buildInitials(leadName),
+                name: leadName,
+                color: toColor(leadName),
                 text: '#ffffff',
               },
-              members: [],
+              members,
             })
           }
 
@@ -308,15 +344,17 @@ export default function ProjectDetailPage({
               projectId: task?.projectId ?? projectId,
               projectName: task?.project?.name ?? projectId,
               tags: Array.isArray(task?.tags) && task.tags.length > 0 ? task.tags : [],
-              assignees: Array.isArray(task?.assignees)
-                ? task.assignees.map((assignee: any) => ({
-                    id: assignee?.id ?? '',
-                    name: assignee?.name ?? 'Unassigned',
-                    initials: (assignee?.name ?? 'Unassigned').split(/\s+/).filter(Boolean).slice(0, 2).map((part: string) => part[0]?.toUpperCase() ?? '').join('') || 'U',
-                    color: assignee?.color ?? '#6366f1',
-                    text: assignee?.text ?? '#ffffff',
-                    isMe: Boolean(assignee?.isMe),
-                  }))
+              assignees: task?.assignee
+                ? [
+                    {
+                      id: task.assignee?.id ?? '',
+                      name: task.assignee?.name ?? 'Unassigned',
+                      initials: (task.assignee?.name ?? 'Unassigned').split(/\s+/).filter(Boolean).slice(0, 2).map((part: string) => part[0]?.toUpperCase() ?? '').join('') || 'U',
+                      color: '#6366f1',
+                      text: '#ffffff',
+                      isMe: Boolean(task.assignee?.isMe),
+                    },
+                  ]
                 : [],
             })))
           }
@@ -342,6 +380,63 @@ export default function ProjectDetailPage({
   function openCreate(status: TaskStatus = 'todo') {
     setCreateStatus(status)
     setShowCreate(true)
+  }
+
+  async function copyInviteCode() {
+    if (!project.inviteCode) return
+
+    try {
+      if (typeof navigator !== 'undefined' && navigator.share) {
+        await navigator.share({
+          title: `${project.name} invite`,
+          text: `Use invite code ${project.inviteCode} to join ${project.name}`,
+        })
+      } else if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(project.inviteCode)
+      }
+      setInviteMessage('Invite code copied and ready to share.')
+    } catch {
+      setInviteMessage('Unable to share the invite right now.')
+    }
+  }
+
+  async function handleJoinByCode(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+
+    if (!joinCode.trim()) {
+      setJoinMessage('Enter an invite code to join a project.')
+      return
+    }
+
+    setJoining(true)
+    setJoinMessage(null)
+
+    try {
+      const token = await getToken({ template: 'postman' })
+      const response = await fetch(`/api/v1/projects/join/${encodeURIComponent(joinCode.trim())}`, {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      })
+
+      const data = await response.json().catch(() => null)
+      if (!response.ok || !data?.success) {
+        throw new Error(data?.error || 'Unable to join this project')
+      }
+
+      setJoinCode('')
+      setJoinMessage('You joined the project successfully.')
+      if (data?.project?.id) {
+        router.push(`/projects/${data.project.id}`)
+      }
+    } catch (err) {
+      setJoinMessage(err instanceof Error ? err.message : 'Unable to join this project')
+    } finally {
+      setJoining(false)
+    }
   }
 
   async function onDragStart(task: ProjectTaskItem, from: TaskStatus) {
@@ -459,6 +554,70 @@ export default function ProjectDetailPage({
         <Button onClick={() => openCreate('todo')} className="text-sm font-medium rounded-lg shrink-0">
           + New task
         </Button>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr] mb-6">
+        <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Team members</p>
+              <h2 className="text-sm font-semibold text-foreground">People working on this project</h2>
+            </div>
+            <span className="text-xs text-muted-foreground">{project.members.length} members</span>
+          </div>
+          <div className="mt-4 flex flex-col gap-3">
+            {project.members.length > 0 ? project.members.map((member) => (
+              <div key={member.name} className="flex items-center justify-between rounded-lg border border-border bg-background/70 px-3 py-2">
+                <div className="flex items-center gap-2">
+                  <div
+                    className="w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-bold"
+                    style={{ background: member.color, color: member.text }}
+                  >
+                    {member.initials}
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-foreground">{member.name}</p>
+                    <p className="text-xs text-muted-foreground">{(member.role ?? 'MEMBER').toLowerCase()}</p>
+                  </div>
+                </div>
+                <span className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+                  {(member.role ?? 'MEMBER').toLowerCase() === 'owner' ? 'Owner' : member.role ?? 'Member'}
+                </span>
+              </div>
+            )) : <p className="text-sm text-muted-foreground">No members yet.</p>}
+          </div>
+        </section>
+
+        <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Invite people</p>
+          <h2 className="text-sm font-semibold text-foreground">Share an invite code or join with one</h2>
+          <div className="mt-4 rounded-xl border border-border bg-background/80 p-3">
+            <p className="text-xs text-muted-foreground">Invite code</p>
+            <div className="mt-2 flex items-center justify-between gap-2 rounded-lg border border-border bg-background px-3 py-2">
+              <span className="font-mono text-sm font-semibold text-foreground">{project.inviteCode || 'No code yet'}</span>
+              <Button type="button" onClick={copyInviteCode} className="rounded-lg text-xs px-3 py-2">
+                Share code
+              </Button>
+            </div>
+            {inviteMessage && <p className="mt-2 text-xs text-emerald-500">{inviteMessage}</p>}
+          </div>
+
+          <form onSubmit={handleJoinByCode} className="mt-4 space-y-3">
+            <label className="flex flex-col text-sm text-muted-foreground">
+              Join with invite code
+              <input
+                value={joinCode}
+                onChange={(event) => setJoinCode(event.target.value)}
+                placeholder="Enter a project code"
+                className="mt-2 rounded-lg border border-border bg-background text-foreground px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/30"
+              />
+            </label>
+            <Button type="submit" className="rounded-lg" disabled={joining}>
+              {joining ? 'Joining…' : 'Join project'}
+            </Button>
+            {joinMessage && <p className="text-xs text-muted-foreground">{joinMessage}</p>}
+          </form>
+        </section>
       </div>
 
       {/* Meta row */}

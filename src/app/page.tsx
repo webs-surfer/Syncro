@@ -236,14 +236,18 @@ export default async function HomePage() {
           <SyncroLogo />
 
           <nav className="hidden md:flex items-center gap-8">
-            {['Features', 'Pricing', 'Docs'].map((item) => (
-              <a
-                key={item}
-                href={`#${item.toLowerCase()}`}
+            {[
+              { label: 'Features', href: '/features' },
+              { label: 'Billing', href: '/billing' },
+              { label: 'Docs', href: '/docs' },
+            ].map((item) => (
+              <Link
+                key={item.label}
+                href={item.href}
                 className="text-sm text-gray-500 hover:text-gray-900 transition-colors"
               >
-                {item}
-              </a>
+                {item.label}
+              </Link>
             ))}
           </nav>
 

@@ -28,10 +28,10 @@ export default function Sidebar() {
         {!collapsed && (
           <div className="flex items-center gap-2.5 px-2">
             <div className="w-7 h-7 rounded-lg bg-blue-600 flex items-center justify-center shrink-0 text-white text-xs font-bold">
-              C
+              S
             </div>
             <span className="text-white font-semibold text-sm tracking-tight">
-              CollabPM
+              Syncro
             </span>
           </div>
         )}

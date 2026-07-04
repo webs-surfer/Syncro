@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from 'react'
 import Link from 'next/link'
+import { useAuth } from '@clerk/nextjs'
 import { Button } from '@/components/ui/button'
 import { useTaskStore } from '@/lib/taskStore'
 
@@ -16,12 +17,16 @@ const priorityStyles: Record<Priority, string> = {
 }
 
 export default function ProjectsClient() {
-  const { projects, isLoading, createProject } = useTaskStore()
+  const { getToken } = useAuth()
+  const { projects, isLoading, createProject, refreshData } = useTaskStore()
   const [showCreate, setShowCreate] = useState(false)
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [priority, setPriority] = useState<Priority>('medium')
   const [status, setStatus] = useState<Status>('active')
+  const [joinCode, setJoinCode] = useState('')
+  const [joinMessage, setJoinMessage] = useState<string | null>(null)
+  const [joining, setJoining] = useState(false)
 
   async function handleCreateProject(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -39,6 +44,43 @@ export default function ProjectsClient() {
     setShowCreate(false)
   }
 
+  async function handleJoinProject(event?: FormEvent<HTMLFormElement>) {
+    event?.preventDefault()
+
+    if (!joinCode.trim()) {
+      setJoinMessage('Enter an invite code to join a project.')
+      return
+    }
+
+    setJoining(true)
+    setJoinMessage(null)
+
+    try {
+      const token = await getToken({ template: 'postman' })
+      const response = await fetch(`/api/v1/projects/join/${encodeURIComponent(joinCode.trim())}`, {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      })
+
+      const data = await response.json().catch(() => null)
+      if (!response.ok || !data?.success) {
+        throw new Error(data?.error || 'Unable to join project')
+      }
+
+      setJoinCode('')
+      setJoinMessage('You joined the project successfully.')
+      await refreshData()
+    } catch (error) {
+      setJoinMessage(error instanceof Error ? error.message : 'Unable to join project')
+    } finally {
+      setJoining(false)
+    }
+  }
+
   const recentProjects = projects.slice(0, 3)
   const projectCount = projects.length
 
@@ -53,6 +95,27 @@ export default function ProjectsClient() {
           {showCreate ? 'Cancel' : '+ New project'}
         </Button>
       </div>
+
+      <section className="mb-8 rounded-[18px] border border-border bg-card p-6 shadow-sm">
+        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+          <div>
+            <h2 className="text-sm font-semibold text-foreground">Join a project</h2>
+            <p className="text-sm text-muted-foreground mt-1">Use an invite code to join a team workspace quickly.</p>
+          </div>
+          <form onSubmit={handleJoinProject} className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <input
+              value={joinCode}
+              onChange={(event) => setJoinCode(event.target.value)}
+              placeholder="Enter invite code"
+              className="rounded-lg border border-border bg-background text-foreground px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/30"
+            />
+            <Button type="submit" className="rounded-lg" disabled={joining}>
+              {joining ? 'Joining…' : 'Join'}
+            </Button>
+          </form>
+        </div>
+        {joinMessage && <p className="mt-3 text-sm text-muted-foreground">{joinMessage}</p>}
+      </section>
 
       {showCreate && (
         <section className="mb-8 rounded-[18px] border border-border bg-card p-6 shadow-sm">
@@ -138,7 +201,19 @@ export default function ProjectsClient() {
             </div>
             <p className="text-xs text-muted-foreground leading-relaxed">{project.description}</p>
             <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-              <span>{project.members.length} members</span>
+              <div className="flex items-center gap-1">
+                {project.members.slice(0, 3).map((member, index) => (
+                  <div
+                    key={`${project.id}-${member.name}-${index}`}
+                    title={member.name}
+                    className="w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-bold border-2 border-background"
+                    style={{ background: member.color, color: member.text, marginLeft: index === 0 ? 0 : -4 }}
+                  >
+                    {member.initials}
+                  </div>
+                ))}
+                <span className="ml-2">{project.members.length} members</span>
+              </div>
               <span>{project.status}</span>
             </div>
           </Link>

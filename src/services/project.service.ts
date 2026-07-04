@@ -29,8 +29,9 @@ export class ProjectService {
   }
 
   // Get all projects where the user is a member.
-  static async getUserProjects(userId: string): Promise<Project[]> {
-    const project = await prisma.project.findMany({
+  // Include member user info so the API can return member names and other details.
+  static async getUserProjects(userId: string): Promise<any[]> {
+    const projects = await prisma.project.findMany({
       where: {
         members: {
           some: {
@@ -38,23 +39,67 @@ export class ProjectService {
           },
         },
       },
+      include: {
+        members: {
+          include: { user: true },
+        },
+      },
     });
-    return project;
+
+    // Normalize members to include top-level name/email/imageUrl to match frontend expectations
+    return projects.map((p) => ({
+      ...p,
+      members: p.members.map((m: ProjectMember & { user: any }) => ({
+        id: m.id,
+        userId: m.userId,
+        role: m.role,
+        joinedAt: m.joinedAt,
+        name: m.user?.name ?? '',
+        email: m.user?.email ?? '',
+        imageUrl: m.user?.imageUrl ?? null,
+      })),
+    }));
   }
 
-  // Get all members of a specific project.
-  static async getProjectMembers(projectId: string): Promise<ProjectMember[]> {
+  // Get all members of a specific project, including user info.
+  static async getProjectMembers(projectId: string): Promise<any[]> {
     const members = await prisma.projectMember.findMany({
       where: { projectId },
+      include: { user: true },
     });
-    return members;
+
+    return members.map((m) => ({
+      id: m.id,
+      userId: m.userId,
+      role: m.role,
+      joinedAt: m.joinedAt,
+      name: m.user?.name ?? '',
+      email: m.user?.email ?? '',
+      imageUrl: m.user?.imageUrl ?? null,
+    }));
   }
 
   // Get a project by its ID.
-  static async getProjectById(id: string): Promise<Project | null> {
-    return await prisma.project.findUnique({
+  static async getProjectById(id: string): Promise<any | null> {
+    const project = await prisma.project.findUnique({
       where: { id },
+      include: { members: { include: { user: true } } },
     });
+
+    if (!project) return null;
+
+    return {
+      ...project,
+      members: project.members.map((m: ProjectMember & { user: any }) => ({
+        id: m.id,
+        userId: m.userId,
+        role: m.role,
+        joinedAt: m.joinedAt,
+        name: m.user?.name ?? '',
+        email: m.user?.email ?? '',
+        imageUrl: m.user?.imageUrl ?? null,
+      })),
+    };
   }
   // Check if a user is an admin of a project.
   static async isUserAdmin(

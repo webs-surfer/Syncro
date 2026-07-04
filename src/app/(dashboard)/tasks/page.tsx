@@ -87,15 +87,17 @@ function mapApiTask(task: any, projectNameByIdOrFallback?: Map<string, string> |
                     : 'bg-muted/20 text-muted-foreground',
             },
           ],
-    assignees: Array.isArray(task?.assignees)
-      ? task.assignees.map((assignee: any) => ({
-          id: assignee?.id ?? '',
-          name: assignee?.name ?? 'Unassigned',
-          initials: (assignee?.name ?? 'Unassigned').split(/\s+/).filter(Boolean).slice(0, 2).map((part: string) => part[0]?.toUpperCase() ?? '').join('') || 'U',
-          color: assignee?.color ?? '#6366f1',
-          text: assignee?.text ?? '#ffffff',
-          isMe: Boolean(assignee?.isMe),
-        }))
+    assignees: task?.assignee
+      ? [
+          {
+            id: task.assignee?.id ?? '',
+            name: task.assignee?.name ?? 'Unassigned',
+            initials: (task.assignee?.name ?? 'Unassigned').split(/\s+/).filter(Boolean).slice(0, 2).map((part: string) => part[0]?.toUpperCase() ?? '').join('') || 'U',
+            color: '#6366f1',
+            text: '#ffffff',
+            isMe: Boolean(task.assignee?.isMe),
+          },
+        ]
       : [],
   }
 }

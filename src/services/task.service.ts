@@ -45,6 +45,21 @@ export class TaskService {
   }
 
   /**
+   * Fetch a single task by its ID with all related data (project, assignee, creator).
+   * Returns null if the task does not exist.
+   */
+  static async getByIdWithRelations(id: string) {
+    return prisma.task.findUnique({
+      where: { id },
+      include: {
+        project: true,
+        assignee: true,
+        creator: true,
+      },
+    });
+  }
+
+  /**
    * Fetch all tasks belonging to a specific project,
    * ordered by (status ASC, order ASC) for kanban display.
    */
@@ -52,6 +67,22 @@ export class TaskService {
     return prisma.task.findMany({
       where: { projectId },
       orderBy: [{ status: "asc" }, { order: "asc" }],
+    });
+  }
+
+  /**
+   * Fetch all tasks belonging to a specific project with related data,
+   * ordered by (status ASC, order ASC) for kanban display.
+   */
+  static async getByProjectIdWithRelations(projectId: string) {
+    return prisma.task.findMany({
+      where: { projectId },
+      orderBy: [{ status: "asc" }, { order: "asc" }],
+      include: {
+        project: true,
+        assignee: true,
+        creator: true,
+      },
     });
   }
 
@@ -65,6 +96,51 @@ export class TaskService {
         OR: [{ createdById: userId }, { assigneeId: userId }],
       },
       orderBy: [{ status: "asc" }, { order: "asc" }],
+    });
+  }
+
+  /**
+   * Fetch all tasks that a user created or is assigned to,
+   * across all projects, with related data.
+   */
+  static async getAllTasksByUserIdWithRelations(userId: string) {
+    return prisma.task.findMany({
+      where: {
+        OR: [{ createdById: userId }, { assigneeId: userId }],
+      },
+      orderBy: [{ status: "asc" }, { order: "asc" }],
+      include: {
+        project: true,
+        assignee: true,
+        creator: true,
+      },
+    });
+  }
+
+  /**
+   * Fetch all tasks assigned to a user across all projects.
+   * Only returns tasks where the user is the assignee.
+   */
+  static async getTasksAssignedToUser(userId: string): Promise<Task[]> {
+    return prisma.task.findMany({
+      where: { assigneeId: userId },
+      orderBy: [{ status: "asc" }, { order: "asc" }],
+    });
+  }
+
+  /**
+   * Fetch all tasks assigned to a user across all projects with related data.
+   * Only returns tasks where the user is the assignee.
+   */
+  static async getTasksAssignedToUserWithRelations(userId: string) {
+    return prisma.task.findMany({
+      where: { assigneeId: userId },
+      orderBy: [{ status: "asc" }, { order: "asc" }],
+      include: {
+        project: true,
+        assignee: true,
+        creator: true,
+      },
     });
   }
 
